@@ -139,10 +139,11 @@ All seeded credentials configured in [`packages/database/prisma/seed.ts`](packag
 | **Hotel Manager (Alt)** | `manager.paris@grandluxe.com` | `Manager123!` | Le Grand Luxe Paris (alternate login) |
 | **Front Desk Reception** | `receptionist.paris@grandluxe.com` | `Staff123!` | Le Grand Luxe Paris: check-in, check-out, room allocation, walk-ins |
 | **Housekeeping** | `housekeeping.paris@grandluxe.com` | `Staff123!` | Le Grand Luxe Paris: turnover cleaning queue, inspection requests |
-| **Guest (Verified Paris Stay)** | `test2@mail.com` | `123456789` | Completed stay in Room 201 (Royal Palais Suite), verified rating showcase |
-| **Guest (Verified Tokyo Stay)** | `test1@mail.com` | `123456789` | Completed stay in Tokyo (Modern Ginza Studio) |
+| **Guest (Unrated Paris Stay)** | `test2@mail.com` | `123456789` | Completed stay in Paris (Deluxe Tuileries Room); unrated with active notification to test and demonstrate rating modal |
+| **Guest (Verified Paris Stay)** | `guest.sophia@example.com` | `Guest123!` | Completed stay in Paris (Royal Palais Suite), verified 5★ review showcase |
+| **Guest (Verified Tokyo Stay)** | `test1@mail.com` | `123456789` | Completed stay in Tokyo (Modern Ginza Studio), verified review |
 | **Guest (Verified Bali Stay)** | `test3@mail.com` | `123456789` | Completed stay in Bali (Oceanfront Cliffside Villa) |
-| **Guest (Verified Mandi Stay)** | `test4@mail.com` | `123456789` | Completed stay in Mandi (Himalayan Mountain Suite) |
+| **Guest (Verified Dubai Stay)** | `test4@mail.com` | `123456789` | Completed stay in Dubai (Royal Palm Beach Villa), verified review |
 | **Standard Guest** | `guest.sophia@example.com` | `Guest123!` | Consumer discovery, search, temporary holds, and reservations |
 
 ---
@@ -150,7 +151,7 @@ All seeded credentials configured in [`packages/database/prisma/seed.ts`](packag
 ## 6. End-to-End User Journeys
 
 ### 1. Consumer / Guest Journey
-1. **Search & 3D Globe:** Search destinations (Paris, Tokyo, Bali, New York, Dubai, Mandi) with date pickers (supporting same-day check-in) and guest counts (including "All Rooms").
+1. **Search & 3D Globe:** Search destinations (Paris, Tokyo, Bali, New York, Dubai) with date pickers (supporting same-day check-in) and guest counts (including "All Rooms").
 2. **Room Selection:** Browse room categories, high-resolution WebP collages, amenities, and commercial rate plans.
 3. **15-Minute Temporary Hold:** Locks inventory atomically; shows a live 15-minute countdown clock.
 4. **Sandbox Payment:** Enter card details (`4242...`) with target-fingerprinted idempotency; receive a cryptographic confirmation code (e.g. `RES-REV-PARIS-101`).

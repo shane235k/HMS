@@ -31,26 +31,15 @@ export interface HotelSearchParams {
 }
 
 const DEFAULT_HOTEL_IMAGES: Record<string, string> = {
-  'Le Grand Luxe Paris': '/images/homepage/hotel-modern-facade.webp',
-  'Sakura Onsen & Ryokan Tokyo': '/images/homepage/dest-foggy-valley.webp',
-  'Sakura Boutique Hotel Tokyo': '/images/homepage/dest-misty-lake.webp',
-  'Azure Haven Beach Resort': '/images/homepage/hotel-resort-overwater.webp',
-  'Azure Haven Resort': '/images/homepage/hotel-resort-overwater.webp',
-  'The Manhattan Executive Tower': '/images/homepage/hotel-modern-facade.webp',
-  'The Manhattan Executive Suites': '/images/homepage/dest-tropical-coast.webp',
-  'Alpine Sanctuary St. Moritz': '/images/homepage/hero-alpine-lake.webp',
-  'Emirates Mirage Palace': '/images/homepage/dest-sunset-ridge.webp',
-  'Hill Paradise': '/images/homepage/dest-sunset-ridge.webp',
-  'Vienna Imperial Grand Palace': '/images/homepage/hotel-modern-facade.webp',
+  'Le Grand Luxe Paris': '/images/rooms/paris-royal-suite-1.webp',
+  'Sakura Boutique Hotel Tokyo': '/images/rooms/tokyo-hinoki-penthouse-1.webp',
+  'Sakura Onsen & Ryokan Tokyo': '/images/rooms/tokyo-hinoki-penthouse-1.webp',
+  'Azure Haven Resort': '/images/rooms/bali-cliff-villa-1.webp',
+  'Azure Haven Beach Resort': '/images/rooms/bali-cliff-villa-1.webp',
+  'The Manhattan Executive Suites': '/images/rooms/ny-empire-suite-1.webp',
+  'The Manhattan Executive Tower': '/images/rooms/ny-empire-suite-1.webp',
+  'Emirates Mirage Palace': '/images/rooms/dubai-royal-penthouse-1.webp',
 };
-
-const SAMPLE_FALLBACK_IMAGES = [
-  '/images/homepage/hotel-modern-facade.webp',
-  '/images/homepage/hotel-resort-overwater.webp',
-  '/images/homepage/dest-tropical-coast.webp',
-  '/images/homepage/dest-misty-lake.webp',
-  '/images/homepage/dest-sunset-ridge.webp',
-];
 
 export function getStableHotelCoverImage(hotel: {
   id?: string;
@@ -64,15 +53,7 @@ export function getStableHotelCoverImage(hotel: {
   if (DEFAULT_HOTEL_IMAGES[hotel.name]) {
     return DEFAULT_HOTEL_IMAGES[hotel.name];
   }
-  // Deterministic stable hash so thumbnail NEVER changes when query/filters change
-  let hash = 0;
-  const key = hotel.id || hotel.name;
-  for (let i = 0; i < key.length; i++) {
-    hash = (hash << 5) - hash + key.charCodeAt(i);
-    hash |= 0;
-  }
-  const fallbackIdx = Math.abs(hash) % SAMPLE_FALLBACK_IMAGES.length;
-  return SAMPLE_FALLBACK_IMAGES[fallbackIdx];
+  return '/images/homepage/hotel-modern-facade.webp';
 }
 
 export class HotelsService {

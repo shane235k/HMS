@@ -148,18 +148,6 @@ async function main() {
     },
   });
 
-  const managerMandi = await prisma.user.create({
-    data: {
-      email: 'manager.mandi@hillparadise.com',
-      password_hash: managerPasswordHash,
-      role: Role.HOTEL_MANAGER,
-      first_name: 'Rohit',
-      last_name: 'Sharma',
-      phone: '+91 98160 55555',
-      status: UserStatus.ACTIVE,
-    },
-  });
-
   // 3C. Front Desk & Housekeeping Staff
   const receptionistParis = await prisma.user.create({
     data: {
@@ -246,7 +234,7 @@ async function main() {
     },
   });
 
-  console.log('✓ Created Platform Admin, 6 Managers, Receptionist, Housekeeper, and 5 Guests.\n');
+  console.log('✓ Created Platform Admin, 5 Managers, Receptionist, Housekeeper, and 5 Guests.\n');
 
   // --------------------------------------------------------------------------
   // 4. APPROVED HOTELS & APPLICATIONS
@@ -355,7 +343,6 @@ async function main() {
     starRating: 5,
     description: 'An iconic 19th-century palace hotel overlooking Place Vendôme, combining neoclassical French grandeur with bespoke modern luxury, Michelin-starred gastronomy, and private garden salons.',
     images: [
-      '/images/homepage/dest-misty-lake.webp',
       '/images/rooms/paris-royal-suite-1.webp',
       '/images/rooms/paris-tuileries-1.webp',
       '/images/rooms/paris-haussmann-1.webp',
@@ -400,7 +387,6 @@ async function main() {
     starRating: 5,
     description: 'A serene urban sanctuary infused with minimalist Japanese aesthetics, Hinoki wood craftsmanship, curated tea ceremonies, and seamless high-tech hospitality in the heart of Ginza.',
     images: [
-      '/images/homepage/dest-foggy-valley.webp',
       '/images/rooms/tokyo-hinoki-penthouse-1.webp',
       '/images/rooms/tokyo-tatami-suite-1.webp',
       '/images/rooms/tokyo-ginza-studio-1.webp',
@@ -427,7 +413,6 @@ async function main() {
     starRating: 5,
     description: 'Perched upon the dramatic limestone cliffs of Nusa Dua, offering panoramic Indian Ocean views, private infinity plunge pools, lush frangipani gardens, and holistic wellness pavilions.',
     images: [
-      '/images/homepage/dest-tropical-coast.webp',
       '/images/rooms/bali-cliff-villa-1.webp',
       '/images/rooms/bali-sunset-pool-1.webp',
       '/images/rooms/bali-garden-sanctuary-1.webp',
@@ -454,7 +439,6 @@ async function main() {
     starRating: 4,
     description: 'Soaring high above Bryant Park in Midtown Manhattan, offering refined residential suites with full kitchenettes, ergonomic executive workspaces, and skyline vistas.',
     images: [
-      '/images/homepage/hotel-modern-facade.webp',
       '/images/rooms/ny-empire-suite-1.webp',
       '/images/rooms/ny-premier-studio-1.webp',
       '/images/rooms/ny-hudson-loft-1.webp',
@@ -481,40 +465,13 @@ async function main() {
     starRating: 5,
     description: 'A palatial oasis on the outer crescent of Palm Jumeirah, featuring private white-sand beach access, gold-appointed suites, personal butler service, and Michelin dining.',
     images: [
-      '/images/homepage/dest-sunset-ridge.webp',
       '/images/rooms/dubai-royal-penthouse-1.webp',
       '/images/rooms/dubai-beach-villa-1.webp',
       '/images/rooms/dubai-marina-suite-1.webp',
     ],
   });
 
-  // 6. Hill Paradise Mandi
-  const { hotel: hotelMandi } = await createHotelWithApp({
-    managerId: managerMandi.id,
-    name: 'Hill Paradise',
-    slug: 'hill-paradise',
-    regNumber: 'IN-HP-2024-3312',
-    taxId: '02AABCH1234F1Z5',
-    email: 'info@hillparadise.in',
-    phone: '+91 98160 55555',
-    address: 'Village Kataula, Near Pandoh Dam',
-    city: 'Mandi',
-    state: 'Himachal Pradesh',
-    country: 'India',
-    postalCode: '175001',
-    latitude: 31.7087,
-    longitude: 76.9320,
-    category: HotelCategory.LUXURY,
-    starRating: 5,
-    description: 'Nestled amidst breathtaking Himalayan landscapes, offering an exclusive blend of natural beauty, refined comfort, pine forest tranquility, and authentic mountain hospitality.',
-    images: [
-      '/images/homepage/dest-foggy-valley.webp',
-      '/images/rooms/tokyo-tatami-suite-1.webp',
-      '/images/rooms/bali-garden-sanctuary-1.webp',
-    ],
-  });
-
-  console.log('✓ Created 6 Approved Hotels: Paris, Tokyo, Bali, New York, Dubai, Mandi.\n');
+  console.log('✓ Created 5 Approved Hotels: Paris, Tokyo, Bali, New York, Dubai.\n');
 
   // --------------------------------------------------------------------------
   // 5. ROOM TYPES, PHYSICAL ROOMS & RATE PLANS
@@ -891,46 +848,7 @@ async function main() {
     },
   ]);
 
-  // Mandi (Hill Paradise) Rooms
-  const mandiRooms = await seedHotelRooms(hotelMandi.id, [
-    {
-      name: 'Himalayan Mountain Suite',
-      slug: 'himalayan-mountain-suite',
-      description: 'Panoramic mountain view suite overlooking pine forests with private balcony, cedarwood interior accents, and handcrafted fire hearth.',
-      maxGuests: 3,
-      maxAdults: 2,
-      maxChildren: 1,
-      bedType: '1 King Bed',
-      roomSizeSqm: 65.0,
-      amenities: ['Himalayan Panorama', 'Wood Fireplace', 'Private Balcony', 'High-Speed Wi-Fi', 'Heated Flooring'],
-      images: [
-        '/images/homepage/dest-foggy-valley.webp',
-        '/images/rooms/tokyo-tatami-suite-1.webp',
-        '/images/rooms/bali-garden-sanctuary-1.webp',
-      ],
-      basePriceINR: 22000,
-      roomNumbers: ['101', '102', '103'],
-    },
-    {
-      name: 'Deodar Forest Chalet',
-      slug: 'deodar-forest-chalet',
-      description: 'Tranquil alpine chalet sheltered within fragrant deodar groves, featuring hand-crafted pine furnishings, heated bathroom, and private valley deck.',
-      maxGuests: 2,
-      maxAdults: 2,
-      maxChildren: 0,
-      bedType: '1 Queen Bed',
-      roomSizeSqm: 48.0,
-      amenities: ['Forest Deck', 'Rain Shower', 'High-Speed Wi-Fi', 'Electric Blanket', 'Tea Station'],
-      images: [
-        '/images/rooms/tokyo-tatami-suite-2.webp',
-        '/images/rooms/bali-garden-sanctuary-2.webp',
-      ],
-      basePriceINR: 16500,
-      roomNumbers: ['201', '202', '203'],
-    },
-  ]);
-
-  console.log('✓ Seeded 6 Approved Hotels, 17 Room Types with Collages, and 55 Physical Rooms.\n');
+  console.log('✓ Seeded 5 Approved Hotels, 15 Room Types with Collages, and 49 Physical Rooms.\n');
 
   // --------------------------------------------------------------------------
   // 6. COMPLETED STAYS, PAYMENTS & VERIFIED REVIEWS
@@ -959,9 +877,9 @@ async function main() {
     {
       code: 'RES-REV-PARIS-101',
       hotelId: hotelParis.id,
-      guestId: testGuest2.id,
-      guestName: 'Elena Rostova',
-      guestEmail: testGuest2.email,
+      guestId: standardGuest.id,
+      guestName: 'Sophia Martinez',
+      guestEmail: standardGuest.email,
       roomType: parisRooms[0], // Royal Palais Suite
       roomNumber: '201',
       rating: 5,
@@ -993,16 +911,16 @@ async function main() {
       reviewComment: 'Private plunge pool blending seamlessly into the Indian Ocean horizon. Unparalleled tranquility and authentic Balinese hospitality.',
     },
     {
-      code: 'RES-REV-MANDI-101',
-      hotelId: hotelMandi.id,
+      code: 'RES-REV-DUBAI-101',
+      hotelId: hotelDubai.id,
       guestId: testGuest4.id,
       guestName: 'Priya Nair',
       guestEmail: testGuest4.email,
-      roomType: mandiRooms[0], // Himalayan Mountain Suite
+      roomType: dubaiRooms[0], // Royal Palm Beach Villa
       roomNumber: '101',
       rating: 5,
-      reviewTitle: 'Serene Himalayan Retreat',
-      reviewComment: 'Waking up to misty pine valleys and Himalayan mountain peaks from our private balcony was magical. The wood fireplace and warm Himachali hospitality made this stay extraordinary.',
+      reviewTitle: 'Unrivaled Palm Jumeirah Luxury',
+      reviewComment: 'Private white-sand beach access, temperature-controlled infinity pool, and personal butler service on Palm Jumeirah made this an extraordinary stay.',
     },
   ];
 
@@ -1110,6 +1028,109 @@ async function main() {
 
     console.log(`  ✓ Seeded Completed Stay & Review: ${s.code} -> ${s.roomType.name} (Guest: ${s.guestEmail})`);
   }
+
+  // --------------------------------------------------------------------------
+  // 5B. UNRATED PREVIOUS STAY FOR test2@mail.com (To demonstrate Rating Modal)
+  // --------------------------------------------------------------------------
+  const unratedParisRoomType = parisRooms[1]; // Deluxe Tuileries Room
+  const unratedParisRatePlan = await prisma.ratePlan.findFirst({
+    where: { room_type_id: unratedParisRoomType.id, is_default: true },
+  });
+  const unratedParisPhysicalRoom = await prisma.room.findFirst({
+    where: { hotel_id: hotelParis.id, room_number: '101' },
+  });
+
+  const unratedNightlyRateCents = unratedParisRatePlan ? unratedParisRatePlan.base_price_cents : 3200000;
+  const unratedSubtotalCents = unratedNightlyRateCents;
+  const unratedTaxCents = Math.round(unratedSubtotalCents * 0.12);
+  const unratedTotalCents = unratedSubtotalCents + unratedTaxCents;
+
+  const unratedParisRes = await prisma.reservation.create({
+    data: {
+      reservation_code: 'RES-PARIS-UNRATED-101',
+      hotel_id: hotelParis.id,
+      guest_user_id: testGuest2.id,
+      guest_name: 'Elena Rostova',
+      guest_email: testGuest2.email,
+      guest_phone: '+1 555 0102',
+      check_in_date: checkInDate,
+      check_out_date: checkOutDate,
+      total_rooms_count: 1,
+      status: ReservationStatus.CHECKED_OUT,
+      subtotal_cents: unratedSubtotalCents,
+      tax_cents: unratedTaxCents,
+      fees_cents: 0,
+      total_cents: unratedTotalCents,
+      currency: 'INR',
+      is_walk_in: false,
+      created_at: bookedDate,
+    },
+  });
+
+  const unratedResRoom = await prisma.reservationRoom.create({
+    data: {
+      reservation_id: unratedParisRes.id,
+      room_type_id: unratedParisRoomType.id,
+      rate_plan_id: unratedParisRatePlan!.id,
+      quantity: 1,
+      nightly_rate_cents: unratedNightlyRateCents,
+      total_price_cents: unratedTotalCents,
+      nightly_breakdown: [
+        {
+          date: '2026-11-10',
+          rate_cents: unratedNightlyRateCents,
+          is_override: false,
+        },
+      ],
+    },
+  });
+
+  if (unratedParisPhysicalRoom) {
+    await prisma.roomAssignment.create({
+      data: {
+        reservation_id: unratedParisRes.id,
+        reservation_room_id: unratedResRoom.id,
+        slot_index: 0,
+        room_id: unratedParisPhysicalRoom.id,
+        assigned_at: checkInDate,
+        status: AssignmentStatus.RELEASED,
+        released_at: checkOutDate,
+        release_reason: 'Normal Guest Checkout Completed',
+      },
+    });
+  }
+
+  await prisma.payment.create({
+    data: {
+      reservation_id: unratedParisRes.id,
+      idempotency_key: 'IDEMP-RES-PARIS-UNRATED-101',
+      transaction_reference: 'TXN-RES-PARIS-UNRATED-101',
+      payment_provider: 'MOCK_PROVIDER',
+      payment_method: 'MOCK_CARD',
+      amount_cents: unratedTotalCents,
+      currency: 'INR',
+      status: PaymentStatus.SUCCESS,
+      created_at: bookedDate,
+    },
+  });
+
+  // Seed Checkout Complete notification for testGuest2 so "Rate Your Stay" is visible in notifications
+  await prisma.notification.create({
+    data: {
+      user_id: testGuest2.id,
+      title: 'Checkout Complete — Le Grand Luxe Paris',
+      message: 'Thank you for staying at Le Grand Luxe Paris. How was your visit in the Deluxe Tuileries Room? Rate your stay to share your experience.',
+      type: 'CHECKOUT_COMPLETE',
+      metadata: {
+        hotelId: hotelParis.id,
+        hotelName: hotelParis.name,
+        reservationId: unratedParisRes.id,
+      },
+      is_read: false,
+    },
+  });
+
+  console.log(`  ✓ Seeded UNRATED Completed Stay & Notification for ${testGuest2.email} (Paris Hotel)`);
 
   // --------------------------------------------------------------------------
   // 7. INITIALIZE MONGODB ATLAS CUSTOM & 2DSPHERE INDEXES
