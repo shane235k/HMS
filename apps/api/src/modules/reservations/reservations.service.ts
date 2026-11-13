@@ -36,23 +36,44 @@ export class ReservationsService {
     userRole?: Role,
     userHotelId?: string
   ) {
-    // 1. Idempotency Check: Look for existing Payment with this idempotency key
-    const existingPayment = await prisma.payment.findUnique({
-      where: { idempotency_key: input.idempotencyKey },
-      include: {
-        reservation: {
-          include: {
-            hotel: true,
-            rooms: {
-              include: {
-                room_type: { select: { id: true, name: true, slug: true } },
-                rate_plan: { select: { id: true, name: true, cancellation_policy: true } },
+    // 1 & 2. Concurrent Verification: Idempotency Payment check & Reservation Fetch in parallel
+    const isObjectId = /^[0-9a-fA-F]{24}$/.test(reservationIdOrCode);
+
+    const [existingPayment, reservation] = await Promise.all([
+      input.idempotencyKey
+        ? prisma.payment.findUnique({
+            where: { idempotency_key: input.idempotencyKey },
+            include: {
+              reservation: {
+                include: {
+                  hotel: true,
+                  rooms: {
+                    include: {
+                      room_type: { select: { id: true, name: true, slug: true } },
+                      rate_plan: { select: { id: true, name: true, cancellation_policy: true } },
+                    },
+                  },
+                },
               },
             },
+          })
+        : Promise.resolve(null),
+      prisma.reservation.findFirst({
+        where: isObjectId
+          ? { OR: [{ id: reservationIdOrCode }, { reservation_code: reservationIdOrCode }] }
+          : { reservation_code: reservationIdOrCode },
+        include: {
+          hotel: true,
+          rooms: {
+            include: {
+              room_type: { select: { id: true, name: true, slug: true } },
+              rate_plan: { select: { id: true, name: true, cancellation_policy: true } },
+            },
           },
+          payments: true,
         },
-      },
-    });
+      }),
+    ]);
 
     if (existingPayment) {
       if (existingPayment.status === PaymentStatus.SUCCESS) {
@@ -68,24 +89,6 @@ export class ReservationsService {
         );
       }
     }
-
-    // 2. Fetch Reservation by ID or Code
-    const isObjectId = /^[0-9a-fA-F]{24}$/.test(reservationIdOrCode);
-    const reservation = await prisma.reservation.findFirst({
-      where: isObjectId
-        ? { OR: [{ id: reservationIdOrCode }, { reservation_code: reservationIdOrCode }] }
-        : { reservation_code: reservationIdOrCode },
-      include: {
-        hotel: true,
-        rooms: {
-          include: {
-            room_type: { select: { id: true, name: true, slug: true } },
-            rate_plan: { select: { id: true, name: true, cancellation_policy: true } },
-          },
-        },
-        payments: true,
-      },
-    });
 
     if (!reservation) {
       throw new NotFoundError('Reservation not found');
@@ -193,40 +196,40 @@ export class ReservationsService {
           throw new BadRequestError('Temporary hold expired during payment processing');
         }
 
-        // Record successful Payment
-        const payment = await tx.payment.create({
-          data: {
-            reservation: { connect: { id: reservation.id } },
-            idempotency_key: input.idempotencyKey,
-            transaction_reference: paymentResult.transactionReference,
-            payment_provider: this.paymentProvider.name,
-            payment_method: input.paymentMethod || 'MOCK_CARD',
-            amount_cents: reservation.total_cents,
-            currency: reservation.currency,
-            status: PaymentStatus.SUCCESS,
-            error_message: null,
-          },
-        });
-
-        // Update reservation to CONFIRMED
-        const updatedReservation = await tx.reservation.update({
-          where: { id: reservation.id },
-          data: {
-            status: ReservationStatus.CONFIRMED,
-            hold_expires_at: null,
-            guest_user_id: reservation.guest_user_id || userId || null,
-          },
-          include: {
-            hotel: true,
-            rooms: {
-              include: {
-                room_type: { select: { id: true, name: true, slug: true } },
-                rate_plan: { select: { id: true, name: true, cancellation_policy: true } },
-              },
+        // Concurrently record successful Payment and confirm Reservation inside transaction
+        const [payment, updatedReservation] = await Promise.all([
+          tx.payment.create({
+            data: {
+              reservation: { connect: { id: reservation.id } },
+              idempotency_key: input.idempotencyKey,
+              transaction_reference: paymentResult.transactionReference,
+              payment_provider: this.paymentProvider.name,
+              payment_method: input.paymentMethod || 'MOCK_CARD',
+              amount_cents: reservation.total_cents,
+              currency: reservation.currency,
+              status: PaymentStatus.SUCCESS,
+              error_message: null,
             },
-            payments: true,
-          },
-        });
+          }),
+          tx.reservation.update({
+            where: { id: reservation.id },
+            data: {
+              status: ReservationStatus.CONFIRMED,
+              hold_expires_at: null,
+              guest_user_id: reservation.guest_user_id || userId || null,
+            },
+            include: {
+              hotel: true,
+              rooms: {
+                include: {
+                  room_type: { select: { id: true, name: true, slug: true } },
+                  rate_plan: { select: { id: true, name: true, cancellation_policy: true } },
+                },
+              },
+              payments: true,
+            },
+          }),
+        ]);
 
         return {
           isReplay: false,

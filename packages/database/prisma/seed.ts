@@ -89,6 +89,19 @@ async function main() {
   // Paris Manager: m1@mail.com (Primary Demo Manager)
   const managerParis = await prisma.user.create({
     data: {
+      email: 'manager.paris@grandluxe.com',
+      password_hash: managerPasswordHash,
+      role: Role.HOTEL_MANAGER,
+      first_name: 'Claire',
+      last_name: 'Delacroix',
+      phone: '+33 1 42 68 00 00',
+      status: UserStatus.ACTIVE,
+    },
+  });
+  console.log(`  ✓ Paris Hotel Manager: ${managerParis.email} (Manager123!)`);
+
+  const managerParisDemo = await prisma.user.create({
+    data: {
       email: 'm1@mail.com',
       password_hash: commonPasswordHash,
       role: Role.HOTEL_MANAGER,
@@ -98,7 +111,7 @@ async function main() {
       status: UserStatus.ACTIVE,
     },
   });
-  console.log(`  ✓ Paris Hotel Manager: ${managerParis.email} (123456789)`);
+  console.log(`  ✓ Paris Hotel Manager Demo: ${managerParisDemo.email} (123456789)`);
 
   const managerTokyo = await prisma.user.create({
     data: {
@@ -349,7 +362,15 @@ async function main() {
     ],
   });
 
-  // Attach Paris staff
+  // Attach Paris staff & demo manager
+  await prisma.staffProfile.create({
+    data: {
+      user_id: managerParisDemo.id,
+      hotel_id: hotelParis.id,
+      role: Role.HOTEL_MANAGER,
+      assigned_by_id: managerParis.id,
+    },
+  });
   await prisma.staffProfile.create({
     data: {
       user_id: receptionistParis.id,

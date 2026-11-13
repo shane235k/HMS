@@ -61,11 +61,6 @@ export default function CheckoutPage() {
 
   useEffect(() => {
     async function loadReservation() {
-      if (authLoading) return;
-      if (!user) {
-        setLoading(false);
-        return;
-      }
       try {
         setLoading(true);
         const data = await apiFetch<any>(`/reservations/${reservationCode}`);
@@ -74,9 +69,6 @@ export default function CheckoutPage() {
         // Autofill account holder / guest name
         if (data.guest_name && !cardholderName) {
           setCardholderName(data.guest_name);
-        } else if (user && !cardholderName) {
-          const userFullName = `${user.firstName || ''} ${user.lastName || ''}`.trim();
-          if (userFullName) setCardholderName(userFullName);
         }
 
         // Calculate initial remaining seconds from hold_expires_at
@@ -93,8 +85,10 @@ export default function CheckoutPage() {
         setLoading(false);
       }
     }
-    loadReservation();
-  }, [reservationCode, router, user, authLoading]);
+    if (reservationCode) {
+      loadReservation();
+    }
+  }, [reservationCode, router]);
 
   // Sync user name if available and cardholderName is empty
   useEffect(() => {

@@ -257,11 +257,32 @@ export class ReceptionService {
       );
     }
 
-    // Verify target physical room
-    const targetRoom = await prisma.room.findUnique({
-      where: { id: input.roomId },
-      include: { room_type: true },
-    });
+    // Verify target physical room, maintenance blocks, and overlapping assignments concurrently
+    const [targetRoom, overlappingBlock, overlappingAssignments] = await Promise.all([
+      prisma.room.findUnique({
+        where: { id: input.roomId },
+        include: { room_type: true },
+      }),
+      prisma.roomBlock.findFirst({
+        where: {
+          room_id: input.roomId,
+          start_date: { lt: reservation.check_out_date },
+          end_date: { gt: reservation.check_in_date },
+        },
+      }),
+      prisma.roomAssignment.findMany({
+        where: {
+          room_id: input.roomId,
+          status: AssignmentStatus.ACTIVE,
+          reservation_id: { not: reservation.id },
+        },
+        include: {
+          reservation: {
+            select: { id: true, reservation_code: true, check_in_date: true, check_out_date: true, status: true },
+          },
+        },
+      }),
+    ]);
 
     if (!targetRoom || targetRoom.hotel_id !== hotelId) {
       throw new NotFoundError('Target room not found in this hotel');
@@ -277,34 +298,11 @@ export class ReceptionService {
       );
     }
 
-    // Check maintenance blocks on target room
-    const overlappingBlock = await prisma.roomBlock.findFirst({
-      where: {
-        room_id: targetRoom.id,
-        start_date: { lt: reservation.check_out_date },
-        end_date: { gt: reservation.check_in_date },
-      },
-    });
-
     if (overlappingBlock) {
       throw new ConflictError(
         `Room ${targetRoom.room_number} is blocked for maintenance from ${overlappingBlock.start_date.toISOString().split('T')[0]} to ${overlappingBlock.end_date.toISOString().split('T')[0]} (${overlappingBlock.reason}).`
       );
     }
-
-    // Check conflicting active room assignments for overlapping stay dates
-    const overlappingAssignments = await prisma.roomAssignment.findMany({
-      where: {
-        room_id: targetRoom.id,
-        status: AssignmentStatus.ACTIVE,
-        reservation_id: { not: reservation.id },
-      },
-      include: {
-        reservation: {
-          select: { id: true, reservation_code: true, check_in_date: true, check_out_date: true, status: true },
-        },
-      },
-    });
 
     for (const oa of overlappingAssignments) {
       if (

@@ -3,6 +3,7 @@
 
 import React from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { HotelSearchResult } from '@hbms/shared';
 import {
   MapPin,
@@ -55,21 +56,23 @@ export const HotelCard: React.FC<HotelCardProps> = ({
       <div>
         {/* Cover Image & Badges */}
         <div className="relative h-60 w-full bg-neutral-100 overflow-hidden">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
+          <Image
             src={hotel.coverImage}
             alt={hotel.name}
-            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+            fill
+            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+            className="object-cover transition-transform duration-500 group-hover:scale-105"
+            loading="lazy"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent z-10" />
 
           {/* Category Badge */}
-          <div className="absolute top-4 left-4 px-3.5 py-1.5 rounded-full bg-white/95 backdrop-blur-md text-xs font-normal text-neutral-900 shadow-sm">
+          <div className="absolute top-4 left-4 z-20 px-3.5 py-1.5 rounded-full bg-white/95 backdrop-blur-md text-xs font-normal text-neutral-900 shadow-sm">
             {hotel.category}
           </div>
 
           {/* Rating Badges */}
-          <div className="absolute top-4 right-4 flex items-center gap-1.5">
+          <div className="absolute top-4 right-4 z-20 flex items-center gap-1.5">
             {hotel.totalReviews && hotel.totalReviews > 0 ? (
               <div className="px-3 py-1.5 rounded-full bg-black/80 backdrop-blur-md text-xs font-normal text-white flex items-center gap-1.5 shadow-sm">
                 <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
@@ -85,7 +88,7 @@ export const HotelCard: React.FC<HotelCardProps> = ({
           </div>
 
           {/* Availability Pill */}
-          <div className="absolute bottom-3 left-4 right-4 flex items-center justify-between">
+          <div className="absolute bottom-3 left-4 right-4 z-20 flex items-center justify-between">
             <span className="inline-flex items-center gap-1.5 text-xs text-white bg-black/75 backdrop-blur-md px-3 py-1 rounded-full font-light border border-white/10">
               <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
               <span>{hotel.isAvailable ? 'Available for your stay' : 'Inventory open'}</span>

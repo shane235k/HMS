@@ -487,60 +487,118 @@ export class HotelsService {
       Boolean(checkInDate && checkOutDate) &&
       new Date(checkInDate!).getTime() < new Date(checkOutDate!).getTime();
 
-    const processedHotels: any[] = [];
+    // Process all candidate hotels concurrently in parallel
+    const processedHotelsResults = await Promise.all(
+      hotels.map(async (hotel) => {
+        let startingPriceCents = 0;
+        let totalStayPriceCents = 0;
+        let availableRoomTypesCount = 0;
+        let totalAvailableRooms = 0;
+        let isAvailable = true;
 
-    for (let idx = 0; idx < hotels.length; idx++) {
-      const hotel = hotels[idx];
-      let startingPriceCents = 0;
-      let totalStayPriceCents = 0;
-      let availableRoomTypesCount = 0;
-      let totalAvailableRooms = 0;
-      let isAvailable = true;
+        // Extract all amenities across room types
+        const allHotelAmenities = Array.from(
+          new Set(hotel.room_types.flatMap((rt) => rt.amenities || []))
+        );
 
-      // Extract all amenities across room types
-      const allHotelAmenities = Array.from(
-        new Set(hotel.room_types.flatMap((rt) => rt.amenities || []))
-      );
+        // Add standard amenities if empty
+        if (allHotelAmenities.length === 0) {
+          allHotelAmenities.push('Wi-Fi', 'Room Service', 'Air Conditioning', 'Flat-screen TV');
+        }
 
-      // Add standard amenities if empty
-      if (allHotelAmenities.length === 0) {
-        allHotelAmenities.push('Wi-Fi', 'Room Service', 'Air Conditioning', 'Flat-screen TV');
-      }
-
-      if (hasDates) {
-        try {
-          const avail = await availabilityService.calculateAvailability(
-            hotel.id,
-            checkInDate!,
-            checkOutDate!,
-            numGuests,
-            numRooms
+        // Filter by amenities early before expensive availability calculations
+        if (amenities && amenities.length > 0) {
+          const matchesAllAmenities = amenities.every((reqAmenity) =>
+            allHotelAmenities.some((hAmenity) =>
+              hAmenity.toLowerCase().includes(reqAmenity.toLowerCase())
+            )
           );
-
-          // Find room types that meet requestedRooms and capacity (or all available if isAll)
-          const suitableRoomTypes = isAll
-            ? avail.roomTypes.filter((rt) => rt.availableQuantity >= 1)
-            : avail.roomTypes.filter(
-                (rt) => rt.availableQuantity >= numRooms && rt.maxGuests >= numGuests
-              );
-
-          if (suitableRoomTypes.length === 0) {
-            // Per requirement: "Display only hotels with suitable available inventory for the requested stay."
-            continue;
+          if (!matchesAllAmenities) {
+            return null;
           }
+        }
 
-          availableRoomTypesCount = suitableRoomTypes.length;
-          totalAvailableRooms = suitableRoomTypes.reduce((acc, rt) => acc + rt.availableQuantity, 0);
+        if (hasDates) {
+          try {
+            const avail = await availabilityService.calculateAvailability(
+              hotel.id,
+              checkInDate!,
+              checkOutDate!,
+              numGuests,
+              numRooms,
+              prisma,
+              { hotel }
+            );
 
-          // Collect all available room packages & rates for this stay
+            // Find room types that meet requestedRooms and capacity (or all available if isAll)
+            const suitableRoomTypes = isAll
+              ? avail.roomTypes.filter((rt) => rt.availableQuantity >= 1)
+              : avail.roomTypes.filter(
+                  (rt) => rt.availableQuantity >= numRooms && rt.maxGuests >= numGuests
+                );
+
+            if (suitableRoomTypes.length === 0) {
+              // Per requirement: "Display only hotels with suitable available inventory for the requested stay."
+              return null;
+            }
+
+            availableRoomTypesCount = suitableRoomTypes.length;
+            totalAvailableRooms = suitableRoomTypes.reduce((acc, rt) => acc + rt.availableQuantity, 0);
+
+            // Collect all available room packages & rates for this stay
+            const packages: Array<{ nightlyPrice: number; totalPrice: number; roomTypeName: string }> = [];
+            for (const rt of suitableRoomTypes) {
+              for (const rp of rt.ratePlans) {
+                if (rp.isAvailable && rp.totalCents > 0) {
+                  const nightlyPrice = Math.round(rp.totalCents / avail.totalNights);
+                  packages.push({
+                    nightlyPrice,
+                    totalPrice: rp.totalCents,
+                    roomTypeName: rt.name,
+                  });
+                }
+              }
+            }
+
+            if (packages.length === 0) {
+              return null;
+            }
+
+            // Context-aware budget matching:
+            // Check if any room packages meet the user's budget range [minPrice, maxPrice]
+            const hasPriceFilter = minPrice !== undefined || maxPrice !== undefined;
+            let matchingPackages = packages;
+            if (hasPriceFilter) {
+              matchingPackages = packages.filter((pkg) => {
+                if (minPrice !== undefined && pkg.nightlyPrice < minPrice) return false;
+                if (maxPrice !== undefined && pkg.nightlyPrice > maxPrice) return false;
+                return true;
+              });
+
+              // Discard hotel only if ZERO room packages fall within the user's budget
+              if (matchingPackages.length === 0) {
+                return null;
+              }
+            }
+
+            // Display the lowest rate that satisfies the user's search
+            const sortedPackages = matchingPackages.sort((a, b) => a.nightlyPrice - b.nightlyPrice);
+            const chosenPackage = sortedPackages[0];
+            startingPriceCents = chosenPackage.nightlyPrice;
+            totalStayPriceCents = chosenPackage.totalPrice;
+          } catch (err) {
+            // If availability check fails for this hotel, discard
+            return null;
+          }
+        } else {
+          // No dates specified - collect all packages across room types
           const packages: Array<{ nightlyPrice: number; totalPrice: number; roomTypeName: string }> = [];
-          for (const rt of suitableRoomTypes) {
-            for (const rp of rt.ratePlans) {
-              if (rp.isAvailable && rp.totalCents > 0) {
-                const nightlyPrice = Math.round(rp.totalCents / avail.totalNights);
+          for (const rt of hotel.room_types) {
+            for (const rp of rt.rate_plans) {
+              if (rp.base_price_cents > 0) {
                 packages.push({
-                  nightlyPrice,
-                  totalPrice: rp.totalCents,
+                  nightlyPrice: rp.base_price_cents,
+                  totalPrice: rp.base_price_cents,
                   roomTypeName: rt.name,
                 });
               }
@@ -548,12 +606,9 @@ export class HotelsService {
           }
 
           if (packages.length === 0) {
-            isAvailable = false;
-            continue;
+            packages.push({ nightlyPrice: 25000, totalPrice: 25000, roomTypeName: 'Standard Room' });
           }
 
-          // Context-aware budget matching:
-          // Check if any room packages meet the user's budget range [minPrice, maxPrice]
           const hasPriceFilter = minPrice !== undefined || maxPrice !== undefined;
           let matchingPackages = packages;
           if (hasPriceFilter) {
@@ -563,116 +618,64 @@ export class HotelsService {
               return true;
             });
 
-            // Discard hotel only if ZERO room packages fall within the user's budget
             if (matchingPackages.length === 0) {
-              continue;
+              return null;
             }
           }
 
-          // Display the lowest rate that satisfies the user's search
           const sortedPackages = matchingPackages.sort((a, b) => a.nightlyPrice - b.nightlyPrice);
           const chosenPackage = sortedPackages[0];
           startingPriceCents = chosenPackage.nightlyPrice;
           totalStayPriceCents = chosenPackage.totalPrice;
-        } catch (err) {
-          // If availability check fails for this hotel, continue
-          continue;
-        }
-      } else {
-        // No dates specified - collect all packages across room types
-        const packages: Array<{ nightlyPrice: number; totalPrice: number; roomTypeName: string }> = [];
-        for (const rt of hotel.room_types) {
-          for (const rp of rt.rate_plans) {
-            if (rp.base_price_cents > 0) {
-              packages.push({
-                nightlyPrice: rp.base_price_cents,
-                totalPrice: rp.base_price_cents,
-                roomTypeName: rt.name,
-              });
-            }
-          }
+          availableRoomTypesCount = hotel.room_types.length;
+          totalAvailableRooms = hotel.room_types.reduce((acc, rt) => acc + (rt.rooms?.length || 0), 0);
         }
 
-        if (packages.length === 0) {
-          packages.push({ nightlyPrice: 25000, totalPrice: 25000, roomTypeName: 'Standard Room' });
-        }
+        // Verified Guest rating calculation
+        const hotelReviews = (hotel as any).reviews || [];
+        const totalReviews = hotelReviews.length;
+        const guestRating =
+          totalReviews > 0
+            ? Number((hotelReviews.reduce((sum: number, r: any) => sum + r.rating, 0) / totalReviews).toFixed(1))
+            : null;
 
-        const hasPriceFilter = minPrice !== undefined || maxPrice !== undefined;
-        let matchingPackages = packages;
-        if (hasPriceFilter) {
-          matchingPackages = packages.filter((pkg) => {
-            if (minPrice !== undefined && pkg.nightlyPrice < minPrice) return false;
-            if (maxPrice !== undefined && pkg.nightlyPrice > maxPrice) return false;
-            return true;
-          });
+        // Cover image (deterministic & stable across all searches and filters)
+        const coverImage = getStableHotelCoverImage(hotel);
 
-          if (matchingPackages.length === 0) {
-            continue;
-          }
-        }
+        return {
+          id: hotel.id,
+          name: hotel.name,
+          slug: hotel.slug,
+          description: hotel.description,
+          category: hotel.category,
+          starRating: hotel.star_rating,
+          guestRating,
+          totalReviews,
+          address: hotel.address,
+          city: hotel.city,
+          state: hotel.state,
+          country: hotel.country,
+          postalCode: hotel.postal_code,
+          latitude: hotel.latitude,
+          longitude: hotel.longitude,
+          phone: hotel.phone,
+          email: hotel.email,
+          currency: hotel.currency || 'INR',
+          coverImage,
+          images: hotel.images && hotel.images.length > 0 ? hotel.images : [coverImage],
+          amenities: allHotelAmenities,
+          startingPriceCents,
+          totalStayPriceCents,
+          availableRoomTypesCount,
+          totalAvailableRooms,
+          isAvailable,
+          checkInTime: hotel.check_in_time || '15:00',
+          checkOutTime: hotel.check_out_time || '11:00',
+        };
+      })
+    );
 
-        const sortedPackages = matchingPackages.sort((a, b) => a.nightlyPrice - b.nightlyPrice);
-        const chosenPackage = sortedPackages[0];
-        startingPriceCents = chosenPackage.nightlyPrice;
-        totalStayPriceCents = chosenPackage.totalPrice;
-        availableRoomTypesCount = hotel.room_types.length;
-        totalAvailableRooms = hotel.room_types.reduce((acc, rt) => acc + (rt.rooms?.length || 0), 0);
-      }
-
-      // Filter by amenities (case-insensitive match)
-      if (amenities && amenities.length > 0) {
-        const matchesAllAmenities = amenities.every((reqAmenity) =>
-          allHotelAmenities.some((hAmenity) =>
-            hAmenity.toLowerCase().includes(reqAmenity.toLowerCase())
-          )
-        );
-        if (!matchesAllAmenities) {
-          continue;
-        }
-      }
-
-      // Verified Guest rating calculation
-      const hotelReviews = (hotel as any).reviews || [];
-      const totalReviews = hotelReviews.length;
-      const guestRating =
-        totalReviews > 0
-          ? Number((hotelReviews.reduce((sum: number, r: any) => sum + r.rating, 0) / totalReviews).toFixed(1))
-          : null;
-
-      // Cover image (deterministic & stable across all searches and filters)
-      const coverImage = getStableHotelCoverImage(hotel);
-
-      processedHotels.push({
-        id: hotel.id,
-        name: hotel.name,
-        slug: hotel.slug,
-        description: hotel.description,
-        category: hotel.category,
-        starRating: hotel.star_rating,
-        guestRating,
-        totalReviews,
-        address: hotel.address,
-        city: hotel.city,
-        state: hotel.state,
-        country: hotel.country,
-        postalCode: hotel.postal_code,
-        latitude: hotel.latitude,
-        longitude: hotel.longitude,
-        phone: hotel.phone,
-        email: hotel.email,
-        currency: hotel.currency || 'INR',
-        coverImage,
-        images: hotel.images && hotel.images.length > 0 ? hotel.images : [coverImage],
-        amenities: allHotelAmenities,
-        startingPriceCents,
-        totalStayPriceCents,
-        availableRoomTypesCount,
-        totalAvailableRooms,
-        isAvailable,
-        checkInTime: hotel.check_in_time || '15:00',
-        checkOutTime: hotel.check_out_time || '11:00',
-      });
-    }
+    const processedHotels = processedHotelsResults.filter(Boolean) as any[];
 
     // Apply Sorting
     if (sort === 'price_asc') {

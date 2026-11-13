@@ -119,7 +119,10 @@ export class AvailabilityService {
     checkOutDate: Date | string,
     requestedGuests: number = 1,
     requestedRooms: number = 1,
-    client: any = prisma
+    client: any = prisma,
+    prefetchedData?: {
+      hotel?: any;
+    }
   ): Promise<HotelAvailabilityResponse> {
     const checkIn = normalizeToUtcMidnight(checkInDate);
     const checkOut = normalizeToUtcMidnight(checkOutDate);
@@ -128,19 +131,21 @@ export class AvailabilityService {
       throw new ValidationError('Check-in date must be strictly before check-out date');
     }
 
-    const hotel = await client.hotel.findUnique({
-      where: { id: hotelId },
-      select: {
-        id: true,
-        name: true,
-        slug: true,
-        currency: true,
-        tax_rate_bps: true,
-        check_in_time: true,
-        check_out_time: true,
-        status: true,
-      },
-    });
+    const hotel =
+      prefetchedData?.hotel ||
+      (await client.hotel.findUnique({
+        where: { id: hotelId },
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          currency: true,
+          tax_rate_bps: true,
+          check_in_time: true,
+          check_out_time: true,
+          status: true,
+        },
+      }));
 
     if (!hotel || hotel.status !== 'ACTIVE') {
       throw new NotFoundError('Hotel not found or is currently inactive');
@@ -150,77 +155,73 @@ export class AvailabilityService {
     const totalNights = stayNights.length;
     const now = new Date();
 
-    // 1. Fetch active room types for this hotel
-    const roomTypes = await client.roomType.findMany({
-      where: {
-        hotel_id: hotelId,
-        is_active: true,
-      },
-      include: {
-        rooms: {
-          where: { is_active: true },
-          select: { id: true, room_number: true, floor: true, operational_status: true, is_active: true },
+    // Concurrently fetch active room types, maintenance blocks, and overlapping reservations
+    const [roomTypes, roomBlocks, overlappingReservations] = await Promise.all([
+      client.roomType.findMany({
+        where: {
+          hotel_id: hotelId,
+          is_active: true,
         },
-        rate_plans: {
-          where: { is_active: true },
-          include: {
-            calendars: {
-              where: {
-                date: {
-                  gte: checkIn,
-                  lt: checkOut,
+        include: {
+          rooms: {
+            where: { is_active: true },
+            select: { id: true, room_number: true, floor: true, operational_status: true, is_active: true },
+          },
+          rate_plans: {
+            where: { is_active: true },
+            include: {
+              calendars: {
+                where: {
+                  date: {
+                    gte: checkIn,
+                    lt: checkOut,
+                  },
                 },
               },
             },
           },
         },
-      },
-      orderBy: { name: 'asc' },
-    });
-
-    // 2. Fetch overlapping maintenance blocks for physical rooms belonging to this hotel
-    const roomBlocks = await client.roomBlock.findMany({
-      where: {
-        hotel_id: hotelId,
-        start_date: { lt: checkOut },
-        end_date: { gt: checkIn },
-      },
-      select: {
-        room_id: true,
-        start_date: true,
-        end_date: true,
-      },
-    });
-
-    // 3. Fetch overlapping reservations for this hotel that commit inventory
-    // Overlapping condition: check_in_date < checkOut AND check_out_date > checkIn
-    // Status must be CONFIRMED, CHECKED_IN, or TEMPORARY_HOLD with hold_expires_at > now
-    const overlappingReservations = await client.reservation.findMany({
-      where: {
-        hotel_id: hotelId,
-        check_in_date: { lt: checkOut },
-        check_out_date: { gt: checkIn },
-        OR: [
-          { status: { in: [ReservationStatus.CONFIRMED, ReservationStatus.CHECKED_IN] } },
-          {
-            status: ReservationStatus.TEMPORARY_HOLD,
-            hold_expires_at: { gt: now },
-          },
-        ],
-      },
-      select: {
-        id: true,
-        status: true,
-        check_in_date: true,
-        check_out_date: true,
-        rooms: {
-          select: {
-            room_type_id: true,
-            quantity: true,
+        orderBy: { name: 'asc' },
+      }),
+      client.roomBlock.findMany({
+        where: {
+          hotel_id: hotelId,
+          start_date: { lt: checkOut },
+          end_date: { gt: checkIn },
+        },
+        select: {
+          room_id: true,
+          start_date: true,
+          end_date: true,
+        },
+      }),
+      client.reservation.findMany({
+        where: {
+          hotel_id: hotelId,
+          check_in_date: { lt: checkOut },
+          check_out_date: { gt: checkIn },
+          OR: [
+            { status: { in: [ReservationStatus.CONFIRMED, ReservationStatus.CHECKED_IN] } },
+            {
+              status: ReservationStatus.TEMPORARY_HOLD,
+              hold_expires_at: { gt: now },
+            },
+          ],
+        },
+        select: {
+          id: true,
+          status: true,
+          check_in_date: true,
+          check_out_date: true,
+          rooms: {
+            select: {
+              room_type_id: true,
+              quantity: true,
+            },
           },
         },
-      },
-    });
+      }),
+    ]);
 
     // 4. Compute night-by-night availability and pricing per RoomType
     const roomTypeQuotes: RoomTypeAvailabilityQuote[] = [];
@@ -495,24 +496,19 @@ export class AvailabilityService {
                   `Insufficient inventory for room type "${quote.name}". Requested ${qty}, but only ${quote.availableQuantity} available for the selected dates.`
                 );
               }
-
-              // Fetch current version for conditional update
-              const currentRoomType = await tx.roomType.findUnique({
-                where: { id: roomTypeId },
-                select: { id: true, version: true },
-              });
-
-              if (!currentRoomType) {
-                throw new NotFoundError(`Room type ${roomTypeId} not found`);
-              }
-
-              await tx.roomType.update({
-                where: { id: roomTypeId },
-                data: {
-                  version: { increment: 1 },
-                },
-              });
             }
+
+            // Atomically increment OCC versions in parallel
+            await Promise.all(
+              Array.from(requestedQuantities.keys()).map((roomTypeId) =>
+                tx.roomType.update({
+                  where: { id: roomTypeId },
+                  data: {
+                    version: { increment: 1 },
+                  },
+                })
+              )
+            );
 
             // D. Calculate pricing for all requested line items
             let totalSubtotalCents = 0;
