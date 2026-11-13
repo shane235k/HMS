@@ -1,7 +1,6 @@
 // apps/web/src/app/layout.tsx
 import type { Metadata } from 'next';
 import './globals.css';
-import 'maplibre-gl/dist/maplibre-gl.css';
 import { AuthProvider } from '@/lib/authContext';
 
 export const metadata: Metadata = {
@@ -16,6 +15,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      <head>
+        <link rel="stylesheet" href="/maplibre-gl.css" />
+      </head>
       <body className="min-h-screen bg-canvas-neutral text-charcoal-900 antialiased">
         <AuthProvider>{children}</AuthProvider>
       </body>
