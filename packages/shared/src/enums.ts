@@ -1,0 +1,106 @@
+// packages/shared/src/enums.ts
+
+export enum Role {
+  GUEST = 'GUEST',
+  RECEPTIONIST = 'RECEPTIONIST',
+  HOUSEKEEPING = 'HOUSEKEEPING',
+  HOTEL_MANAGER = 'HOTEL_MANAGER',
+  PLATFORM_ADMIN = 'PLATFORM_ADMIN'
+}
+
+export enum UserStatus {
+  ACTIVE = 'ACTIVE',
+  SUSPENDED = 'SUSPENDED'
+}
+
+export enum HotelStatus {
+  ACTIVE = 'ACTIVE',
+  SUSPENDED = 'SUSPENDED'
+}
+
+export enum ApplicationStatus {
+  PENDING = 'PENDING',
+  UNDER_REVIEW = 'UNDER_REVIEW',
+  APPROVED = 'APPROVED',
+  REJECTED = 'REJECTED',
+  RESUBMISSION_REQUESTED = 'RESUBMISSION_REQUESTED'
+}
+
+export enum HotelCategory {
+  LUXURY = 'LUXURY',
+  BOUTIQUE = 'BOUTIQUE',
+  BUSINESS = 'BUSINESS',
+  RESORT = 'RESORT',
+  BUDGET = 'BUDGET'
+}
+
+export enum OperationalStatus {
+  READY = 'READY',
+  OCCUPIED = 'OCCUPIED',
+  DIRTY = 'DIRTY',
+  CLEANING = 'CLEANING',
+  INSPECTION = 'INSPECTION',
+  MAINTENANCE = 'MAINTENANCE'
+}
+
+export enum AssignmentStatus {
+  ACTIVE = 'ACTIVE',
+  RELEASED = 'RELEASED',
+  CANCELLED = 'CANCELLED'
+}
+
+export enum CancellationPolicy {
+  FREE_CANCELLATION = 'FREE_CANCELLATION',
+  PARTIAL_REFUND = 'PARTIAL_REFUND',
+  NON_REFUNDABLE = 'NON_REFUNDABLE'
+}
+
+export enum ReservationStatus {
+  TEMPORARY_HOLD = 'TEMPORARY_HOLD',
+  CONFIRMED = 'CONFIRMED',
+  CHECKED_IN = 'CHECKED_IN',
+  CHECKED_OUT = 'CHECKED_OUT',
+  CANCELLED = 'CANCELLED',
+  EXPIRED = 'EXPIRED'
+}
+
+export enum PaymentStatus {
+  PENDING = 'PENDING',
+  SUCCESS = 'SUCCESS',
+  FAILED = 'FAILED',
+  REFUNDED = 'REFUNDED'
+}
+
+export enum RefundStatus {
+  PENDING = 'PENDING',
+  PROCESSED = 'PROCESSED',
+  FAILED = 'FAILED'
+}
+
+export enum TaskType {
+  TURNOVER_CLEAN = 'TURNOVER_CLEAN',
+  DAILY_STAY_CLEAN = 'DAILY_STAY_CLEAN',
+  DEEP_CLEAN = 'DEEP_CLEAN',
+  INSPECTION = 'INSPECTION'
+}
+
+export enum TaskStatus {
+  PENDING = 'PENDING',
+  IN_PROGRESS = 'IN_PROGRESS',
+  AWAITING_INSPECTION = 'AWAITING_INSPECTION',
+  COMPLETED = 'COMPLETED'
+}
+
+export enum MaintenancePriority {
+  LOW = 'LOW',
+  MEDIUM = 'MEDIUM',
+  HIGH = 'HIGH',
+  CRITICAL = 'CRITICAL'
+}
+
+export enum MaintenanceStatus {
+  OPEN = 'OPEN',
+  IN_PROGRESS = 'IN_PROGRESS',
+  RESOLVED = 'RESOLVED'
+}
+

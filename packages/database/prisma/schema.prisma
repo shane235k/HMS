@@ -1,0 +1,622 @@
+// packages/database/prisma/schema.prisma
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  GUEST
+  RECEPTIONIST
+  HOUSEKEEPING
+  HOTEL_MANAGER
+  PLATFORM_ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum HotelStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum ApplicationStatus {
+  PENDING
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  RESUBMISSION_REQUESTED
+}
+
+enum HotelCategory {
+  LUXURY
+  BOUTIQUE
+  BUSINESS
+  RESORT
+  BUDGET
+}
+
+enum OperationalStatus {
+  READY
+  OCCUPIED
+  DIRTY
+  CLEANING
+  INSPECTION
+  MAINTENANCE
+}
+
+enum AssignmentStatus {
+  ACTIVE
+  RELEASED
+  CANCELLED
+}
+
+enum CancellationPolicy {
+  FREE_CANCELLATION
+  PARTIAL_REFUND
+  NON_REFUNDABLE
+}
+
+enum ReservationStatus {
+  TEMPORARY_HOLD
+  CONFIRMED
+  CHECKED_IN
+  CHECKED_OUT
+  CANCELLED
+  EXPIRED
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  REFUNDED
+}
+
+enum RefundStatus {
+  PENDING
+  PROCESSED
+  FAILED
+}
+
+enum TaskType {
+  TURNOVER_CLEAN
+  DAILY_STAY_CLEAN
+  DEEP_CLEAN
+  INSPECTION
+}
+
+enum TaskStatus {
+  PENDING
+  IN_PROGRESS
+  AWAITING_INSPECTION
+  COMPLETED
+}
+
+enum MaintenancePriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum MaintenanceStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+}
+
+// ----------------------------------------------------
+// EMBEDDED TYPES
+// ----------------------------------------------------
+
+type GeoJsonPoint {
+  type        String   @default("Point")
+  coordinates Float[]  // [longitude, latitude]
+}
+
+type NightlyRateSnapshot {
+  date        String
+  rate_cents  Int
+  is_override Boolean
+}
+
+// ----------------------------------------------------
+// 1. IDENTITY & SESSIONS
+// ----------------------------------------------------
+
+model User {
+  id            String      @id @default(auto()) @map("_id") @db.ObjectId
+  email         String      @unique
+  password_hash String
+  role          Role        @default(GUEST)
+  first_name    String
+  last_name     String
+  phone         String?
+  status        UserStatus  @default(ACTIVE)
+  created_at    DateTime    @default(now())
+  updated_at    DateTime    @updatedAt
+
+  refresh_tokens         RefreshToken[]
+  applications           HotelApplication[] @relation("ApplicantUser")
+  reviewed_applications  HotelApplication[] @relation("AdminReviewer")
+  managed_hotel          Hotel?             @relation("HotelManager")
+  staff_profile          StaffProfile?      @relation("StaffUser")
+  assigned_staff         StaffProfile[]     @relation("StaffAssignedBy")
+  assigned_rooms         RoomAssignment[]   @relation("AssignedByStaff")
+  reviews                Review[]
+  notifications          Notification[]
+
+  @@index([role])
+}
+
+model RefreshToken {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  user_id    String   @db.ObjectId
+  user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  token_hash String   @unique
+  ip_address String?
+  user_agent String?
+  is_revoked Boolean  @default(false)
+  expires_at DateTime
+  created_at DateTime @default(now())
+
+  @@index([user_id])
+}
+
+// ----------------------------------------------------
+// 2. HOTEL APPLICATION & ONBOARDING
+// ----------------------------------------------------
+
+model HotelApplication {
+  id                           String            @id @default(auto()) @map("_id") @db.ObjectId
+  applicant_user_id            String            @db.ObjectId
+  applicant                    User              @relation("ApplicantUser", fields: [applicant_user_id], references: [id], onDelete: Cascade)
+  hotel_name                   String
+  business_registration_number String
+  tax_id                       String
+  contact_email                String
+  contact_phone                String
+  address                      String
+  city                         String
+  state                        String
+  country                      String
+  postal_code                  String
+  latitude                     Float
+  longitude                    Float
+  category                     HotelCategory     @default(BOUTIQUE)
+  check_in_time                String?           @default("14:00")
+  check_out_time               String?           @default("11:00")
+  description                  String?
+  status                       ApplicationStatus @default(PENDING)
+  rejection_reason             String?
+  admin_notes                  String?
+  reviewed_by_id               String?           @db.ObjectId
+  reviewed_by                  User?             @relation("AdminReviewer", fields: [reviewed_by_id], references: [id])
+  reviewed_at                  DateTime?
+  created_at                   DateTime          @default(now())
+  updated_at                   DateTime          @updatedAt
+
+  hotels Hotel[] // 1:N cardinality compatible with omitting @unique on Hotel.application_id
+
+  @@index([applicant_user_id])
+  @@index([status])
+  @@index([city])
+  @@index([country])
+}
+
+// ----------------------------------------------------
+// 3. PROPERTY & STAFF MANAGEMENT
+// ----------------------------------------------------
+
+model Hotel {
+  id               String            @id @default(auto()) @map("_id") @db.ObjectId
+  application_id   String?           @db.ObjectId // No @unique; partial unique index managed via init-indexes.ts
+  application      HotelApplication? @relation(fields: [application_id], references: [id])
+  manager_id       String            @unique @db.ObjectId // Strict 1:1 Manager Constraint
+  manager          User              @relation("HotelManager", fields: [manager_id], references: [id])
+  name             String
+  slug             String            @unique
+  description      String?
+  category         HotelCategory     @default(BOUTIQUE)
+  star_rating      Int               @default(4)
+  address          String
+  city             String
+  state            String
+  country          String
+  postal_code      String
+  location         GeoJsonPoint
+  latitude         Float
+  longitude        Float
+  phone            String
+  email            String
+  images           String[]
+  status           HotelStatus       @default(ACTIVE)
+  currency         String            @default("INR")
+  check_in_time    String            @default("14:00")
+  check_out_time   String            @default("11:00")
+  tax_rate_bps     Int               @default(1200)
+  created_at       DateTime          @default(now())
+  updated_at       DateTime          @updatedAt
+
+  staff        StaffProfile[]
+  room_types   RoomType[]
+  rooms        Room[]
+  room_blocks  RoomBlock[]
+  reservations Reservation[]
+  reviews      Review[]
+
+  @@index([status])
+  @@index([city])
+  @@index([category])
+}
+
+model StaffProfile {
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  user_id        String   @unique @db.ObjectId
+  user           User     @relation("StaffUser", fields: [user_id], references: [id], onDelete: Cascade)
+  hotel_id       String   @db.ObjectId
+  hotel          Hotel    @relation(fields: [hotel_id], references: [id], onDelete: Cascade)
+  role           Role
+  assigned_by_id String?  @db.ObjectId
+  assigned_by    User?    @relation("StaffAssignedBy", fields: [assigned_by_id], references: [id])
+  is_active      Boolean  @default(true)
+  created_at     DateTime @default(now())
+
+  @@index([hotel_id])
+}
+
+// ----------------------------------------------------
+// 4. ROOM INVENTORY, PRICING & DATE-AWARE BLOCKS
+// ----------------------------------------------------
+
+model RoomType {
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  hotel_id       String   @db.ObjectId
+  hotel          Hotel    @relation(fields: [hotel_id], references: [id], onDelete: Cascade)
+  name           String
+  slug           String
+  description    String?
+  max_guests     Int      @default(2)
+  max_adults     Int      @default(2)
+  max_children   Int      @default(1)
+  bed_type       String   @default("King Bed")
+  room_size_sqm  Float?
+  amenities      String[]
+  images         String[]
+  is_active      Boolean  @default(true)
+  version        Int      @default(0) // OCC Version Counter for Inventory Mutations
+  created_at     DateTime @default(now())
+  updated_at     DateTime @updatedAt
+
+  rooms             Room[]
+  rate_plans        RatePlan[]
+  reservation_rooms ReservationRoom[]
+  reviews           Review[]
+
+  @@unique([hotel_id, name])
+  @@index([hotel_id])
+}
+
+model Room {
+  id                 String            @id @default(auto()) @map("_id") @db.ObjectId
+  hotel_id           String            @db.ObjectId
+  hotel              Hotel             @relation(fields: [hotel_id], references: [id], onDelete: Cascade)
+  room_type_id       String            @db.ObjectId
+  room_type          RoomType          @relation(fields: [room_type_id], references: [id], onDelete: Cascade)
+  room_number        String
+  floor              Int               @default(1)
+  operational_status OperationalStatus @default(READY)
+  is_active          Boolean           @default(true)
+  version            Int               @default(0) // OCC Version Counter for Physical Room & Block Concurrency
+  created_at         DateTime          @default(now())
+  updated_at         DateTime          @updatedAt
+
+  blocks      RoomBlock[]
+  assignments RoomAssignment[]
+
+  @@unique([hotel_id, room_number])
+  @@index([hotel_id])
+  @@index([room_type_id])
+  @@index([operational_status])
+}
+
+model RoomBlock {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  hotel_id      String   @db.ObjectId
+  hotel         Hotel    @relation(fields: [hotel_id], references: [id], onDelete: Cascade)
+  room_id       String   @db.ObjectId
+  room          Room     @relation(fields: [room_id], references: [id], onDelete: Cascade)
+  start_date    DateTime
+  end_date      DateTime
+  reason        String
+  created_by_id String?  @db.ObjectId
+  created_at    DateTime @default(now())
+
+  @@index([hotel_id])
+  @@index([room_id])
+  @@index([start_date, end_date])
+}
+
+model RatePlan {
+  id                         String             @id @default(auto()) @map("_id") @db.ObjectId
+  room_type_id               String             @db.ObjectId
+  room_type                  RoomType           @relation(fields: [room_type_id], references: [id], onDelete: Cascade)
+  name                       String
+  description                String?
+  base_price_cents           Int
+  cancellation_policy        CancellationPolicy @default(FREE_CANCELLATION)
+  cancellation_deadline_hours Int               @default(48)
+  is_default                 Boolean            @default(false)
+  is_active                  Boolean            @default(true)
+  created_at                 DateTime           @default(now())
+  updated_at                 DateTime           @updatedAt
+
+  calendars         RateCalendar[]
+  reservation_rooms ReservationRoom[]
+
+  @@index([room_type_id])
+}
+
+model RateCalendar {
+  id                  String    @id @default(auto()) @map("_id") @db.ObjectId
+  rate_plan_id        String    @db.ObjectId
+  rate_plan           RatePlan  @relation(fields: [rate_plan_id], references: [id], onDelete: Cascade)
+  date                DateTime
+  price_override_cents Int?
+  is_available        Boolean   @default(true)
+  created_at          DateTime  @default(now())
+  updated_at          DateTime  @updatedAt
+
+  @@unique([rate_plan_id, date])
+  @@index([rate_plan_id])
+  @@index([date])
+}
+
+// ----------------------------------------------------
+// 5. RESERVATIONS & FINANCIALS
+// ----------------------------------------------------
+
+model Reservation {
+  id                      String            @id @default(auto()) @map("_id") @db.ObjectId
+  reservation_code        String            @unique
+  idempotency_key         String?           // No @unique; partial unique index managed via init-indexes.ts
+  idempotency_fingerprint String?
+  hotel_id                String            @db.ObjectId
+  hotel                   Hotel             @relation(fields: [hotel_id], references: [id])
+  guest_user_id           String?           @db.ObjectId
+  guest_name              String
+  guest_email             String
+  guest_phone             String
+  check_in_date           DateTime
+  check_out_date          DateTime
+  total_rooms_count       Int               @default(1)
+  status                  ReservationStatus @default(TEMPORARY_HOLD)
+  hold_expires_at         DateTime?
+  subtotal_cents          Int
+  tax_cents               Int
+  fees_cents              Int
+  total_cents             Int
+  currency                String            // Inherited from hotel.currency
+  is_walk_in              Boolean           @default(false)
+  created_at              DateTime          @default(now())
+  updated_at              DateTime          @updatedAt
+
+  rooms        ReservationRoom[]
+  assignments  RoomAssignment[]
+  payments     Payment[]
+  cancellation CancellationRecord?
+  review       Review?
+
+  @@index([hotel_id])
+  @@index([guest_user_id])
+  @@index([status])
+  @@index([check_in_date, check_out_date])
+  @@index([hold_expires_at])
+}
+
+model ReservationRoom {
+  id                 String                @id @default(auto()) @map("_id") @db.ObjectId
+  reservation_id     String                @db.ObjectId
+  reservation        Reservation           @relation(fields: [reservation_id], references: [id], onDelete: Cascade)
+  room_type_id       String                @db.ObjectId
+  room_type          RoomType              @relation(fields: [room_type_id], references: [id])
+  rate_plan_id       String                @db.ObjectId
+  rate_plan          RatePlan              @relation(fields: [rate_plan_id], references: [id])
+  quantity           Int                   @default(1)
+  nightly_rate_cents Int
+  total_price_cents  Int
+  nightly_breakdown  NightlyRateSnapshot[]
+
+  assignments RoomAssignment[]
+
+  @@index([reservation_id])
+  @@index([room_type_id])
+}
+
+model RoomAssignment {
+  id                  String           @id @default(auto()) @map("_id") @db.ObjectId
+  reservation_id      String           @db.ObjectId
+  reservation         Reservation      @relation(fields: [reservation_id], references: [id], onDelete: Cascade)
+  reservation_room_id String           @db.ObjectId
+  reservation_room    ReservationRoom  @relation(fields: [reservation_room_id], references: [id], onDelete: Cascade)
+  slot_index          Int              @default(0) // Stable slot index [0 .. quantity-1]
+  room_id             String           @db.ObjectId
+  room                Room             @relation(fields: [room_id], references: [id])
+  assigned_by_id      String?          @db.ObjectId
+  assigned_by         User?            @relation("AssignedByStaff", fields: [assigned_by_id], references: [id])
+  assigned_at         DateTime         @default(now())
+  status              AssignmentStatus @default(ACTIVE)
+  released_at         DateTime?
+  release_reason      String?
+  notes               String?
+
+  @@index([reservation_id])
+  @@index([reservation_room_id, slot_index])
+  @@index([room_id, status])
+}
+
+model Payment {
+  id                    String        @id @default(auto()) @map("_id") @db.ObjectId
+  reservation_id        String        @db.ObjectId
+  reservation           Reservation   @relation(fields: [reservation_id], references: [id], onDelete: Cascade)
+  idempotency_key       String        @unique
+  transaction_reference String        @unique
+  payment_provider      String        @default("MOCK_PROVIDER")
+  payment_method        String        @default("MOCK_CARD")
+  amount_cents          Int
+  currency              String        // Inherited from reservation.currency
+  status                PaymentStatus @default(PENDING)
+  error_message         String?
+  created_at            DateTime      @default(now())
+
+  refunds RefundRecord[]
+
+  @@index([reservation_id])
+}
+
+model CancellationRecord {
+  id                     String             @id @default(auto()) @map("_id") @db.ObjectId
+  reservation_id         String             @unique @db.ObjectId
+  reservation            Reservation        @relation(fields: [reservation_id], references: [id], onDelete: Cascade)
+  cancelled_by_id        String?            @db.ObjectId
+  cancellation_reason    String?
+  policy_applied         CancellationPolicy @default(FREE_CANCELLATION)
+  eligible_refund_cents  Int
+  cancellation_fee_cents Int                @default(0)
+  currency               String             // Inherited from reservation.currency
+  cancelled_at           DateTime           @default(now())
+
+  refund RefundRecord?
+}
+
+model RefundRecord {
+  id                String             @id @default(auto()) @map("_id") @db.ObjectId
+  cancellation_id   String             @unique @db.ObjectId
+  cancellation      CancellationRecord @relation(fields: [cancellation_id], references: [id], onDelete: Cascade)
+  payment_id        String             @db.ObjectId
+  payment           Payment            @relation(fields: [payment_id], references: [id])
+  refund_reference  String             @unique
+  amount_cents      Int
+  currency          String             // Inherited from payment.currency
+  status            RefundStatus       @default(PENDING)
+  idempotency_key   String             @unique
+  provider_response String?
+  error_message     String?
+  processed_at      DateTime?
+
+  @@index([payment_id])
+}
+
+// ----------------------------------------------------
+// 6. HOUSEKEEPING, MAINTENANCE & AUDIT TRAIL
+// ----------------------------------------------------
+
+model HousekeepingTask {
+  id              String     @id @default(auto()) @map("_id") @db.ObjectId
+  hotel_id        String     @db.ObjectId
+  room_id         String     @db.ObjectId
+  assigned_to_id  String?    @db.ObjectId
+  inspected_by_id String?    @db.ObjectId
+  task_type       TaskType   @default(TURNOVER_CLEAN)
+  status          TaskStatus @default(PENDING)
+  notes           String?
+  started_at      DateTime?
+  completed_at    DateTime?
+  created_at      DateTime   @default(now())
+
+  @@index([hotel_id])
+  @@index([room_id])
+  @@index([status])
+}
+
+model MaintenanceIssue {
+  id             String              @id @default(auto()) @map("_id") @db.ObjectId
+  hotel_id       String              @db.ObjectId
+  room_id        String              @db.ObjectId
+  reported_by_id String?             @db.ObjectId
+  title          String
+  description    String?
+  priority       MaintenancePriority @default(MEDIUM)
+  status         MaintenanceStatus   @default(OPEN)
+  resolved_at    DateTime?
+  created_at     DateTime            @default(now())
+
+  @@index([hotel_id])
+  @@index([room_id])
+  @@index([status])
+}
+
+model AuditLog {
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  hotel_id       String?  @db.ObjectId
+  actor_id       String?  @db.ObjectId
+  actor_role     String?
+  action         String
+  entity_type    String
+  entity_id      String
+  previous_state String?
+  new_state      String?
+  ip_address     String?
+  created_at     DateTime @default(now())
+
+  @@index([hotel_id])
+  @@index([actor_id])
+  @@index([action])
+  @@index([created_at])
+}
+
+// ----------------------------------------------------
+// 7. GUEST REVIEWS & VERIFIED RATINGS
+// ----------------------------------------------------
+
+model Review {
+  id             String       @id @default(auto()) @map("_id") @db.ObjectId
+  hotel_id       String       @db.ObjectId
+  hotel          Hotel        @relation(fields: [hotel_id], references: [id], onDelete: Cascade)
+  reservation_id String?      @unique @db.ObjectId
+  reservation    Reservation? @relation(fields: [reservation_id], references: [id])
+  room_type_id   String?      @db.ObjectId
+  room_type      RoomType?    @relation(fields: [room_type_id], references: [id])
+  user_id        String       @db.ObjectId
+  user           User         @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  rating         Int          // 1 - 5
+  title          String?
+  comment        String
+  stay_date      String?      // e.g. "October 2026"
+  is_verified    Boolean      @default(true)
+  created_at     DateTime     @default(now())
+  updated_at     DateTime     @updatedAt
+
+  @@index([hotel_id])
+  @@index([room_type_id])
+  @@index([user_id])
+}
+
+// ----------------------------------------------------
+// 8. USER NOTIFICATIONS
+// ----------------------------------------------------
+
+model Notification {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  user_id    String   @db.ObjectId
+  user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  title      String
+  message    String
+  type       String   // e.g. "BOOKING_CONFIRMED", "CHECKOUT_COMPLETE", "REVIEW_REQUEST"
+  link       String?
+  metadata   Json?
+  is_read    Boolean  @default(false)
+  created_at DateTime @default(now())
+
+  @@index([user_id])
+  @@index([is_read])
+  @@index([created_at])
+}

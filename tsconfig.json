@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "CommonJS",
+    "moduleResolution": "node",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true
+  },
+  "include": [
+    "packages/database/src/**/*",
+    "packages/database/prisma/**/*",
+    "packages/shared/src/**/*",
+    "apps/api/src/**/*",
+    "apps/api/tests/**/*"
+  ],
+  "exclude": [
+    "apps/web",
+    "node_modules",
+    "**/dist",
+    "**/.next"
+  ]
+}
