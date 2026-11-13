@@ -27,7 +27,7 @@ h1, h2, h3, h4, h5, h6, strong, b, th, .font-bold, .font-extrabold, .font-semibo
 }
 
 .font-medium {
-  font-weight: 350 !important;
+  font-weight: 400 !important;
 }
 
 .font-normal {
@@ -59,7 +59,6 @@ h1, h2, h3, h4, h5, h6, strong, b, th, .font-bold, .font-extrabold, .font-semibo
   aside,
   nav,
   header button,
-  .print\:hidden,
   .no-print {
     display: none !important;
   }
@@ -78,5 +77,3 @@ h1, h2, h3, h4, h5, h6, strong, b, th, .font-bold, .font-extrabold, .font-semibo
     size: auto;
   }
 }
-
-
