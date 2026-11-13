@@ -3,13 +3,12 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/authContext';
 import { Button } from '../ui/Button';
 import { Role } from '@hbms/shared';
 import { Building2, Compass, User, LogOut, ShieldCheck, Hotel, Bell, Star, Check } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
-import { ReviewModal } from '../reviews/ReviewModal';
 
 export interface NavbarProps {
   dark?: boolean;
@@ -18,16 +17,12 @@ export interface NavbarProps {
 export const Navbar: React.FC<NavbarProps> = ({ dark = false }) => {
   const { user, logout } = useAuth();
   const pathname = usePathname();
+  const router = useRouter();
 
   // Notifications state
   const [notifications, setNotifications] = useState<any[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
-  const [selectedReviewTarget, setSelectedReviewTarget] = useState<{
-    hotelId: string;
-    hotelName?: string;
-    reservationId?: string;
-  } | null>(null);
   const notifRef = useRef<HTMLDivElement>(null);
 
   const loadNotifications = useCallback(async () => {
@@ -78,15 +73,12 @@ export const Navbar: React.FC<NavbarProps> = ({ dark = false }) => {
       }
     }
 
-    if (notif.type === 'CHECKOUT_COMPLETE' && notif.metadata?.hotelId) {
-      setIsNotifOpen(false);
-      if (!notif.isReviewed) {
-        setSelectedReviewTarget({
-          hotelId: notif.metadata.hotelId,
-          hotelName: notif.metadata.hotelName,
-          reservationId: notif.metadata.reservationId,
-        });
-      }
+    setIsNotifOpen(false);
+
+    if (notif.type === 'CHECKOUT_COMPLETE') {
+      router.push('/bookings?tab=completed');
+    } else if (notif.type === 'BOOKING_CONFIRMED') {
+      router.push('/bookings');
     }
   };
 
@@ -375,19 +367,6 @@ export const Navbar: React.FC<NavbarProps> = ({ dark = false }) => {
           )}
         </div>
       </div>
-
-      {selectedReviewTarget && (
-        <ReviewModal
-          isOpen={true}
-          onClose={() => setSelectedReviewTarget(null)}
-          hotelId={selectedReviewTarget.hotelId}
-          hotelName={selectedReviewTarget.hotelName}
-          reservationId={selectedReviewTarget.reservationId}
-          onSuccess={() => {
-            loadNotifications();
-          }}
-        />
-      )}
     </header>
   );
 };

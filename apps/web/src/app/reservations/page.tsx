@@ -74,6 +74,16 @@ export default function GuestReservationsPage() {
   };
 
   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const tabParam = params.get('tab') as any;
+      if (tabParam && ['all', 'upcoming', 'completed', 'cancelled'].includes(tabParam)) {
+        setActiveTab(tabParam);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
     if (!authLoading && !user) {
       router.push('/login?redirect=/reservations');
       return;
