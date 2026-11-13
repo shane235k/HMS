@@ -13,14 +13,14 @@
   },
   "dependencies": {
     "@prisma/client": "5.22.0",
-    "bcrypt": "^5.1.1",
-    "mongodb": "^7.8.0"
-  },
-  "devDependencies": {
     "@types/bcrypt": "^5.0.2",
     "@types/node": "^20.12.12",
+    "bcrypt": "^5.1.1",
+    "mongodb": "^7.8.0",
     "prisma": "5.22.0",
-    "tsx": "^4.10.5",
     "typescript": "^5.4.5"
+  },
+  "devDependencies": {
+    "tsx": "^4.10.5"
   }
 }

@@ -238,3 +238,32 @@ Detailed test evidence and logs are documented in [`docs/TEST_SUITE_EVIDENCE.md`
 
 4. **UTC System Clock Date Boundaries for Same-Day Stays:**
    Same-day booking eligibility, temporary hold expiration timers, and midnight turnover transitions are evaluated against the backend server's UTC system clock. If a guest books from a timezone significantly ahead of or behind UTC (such as near 23:55 or 00:05), operational date boundaries reflect the UTC calendar date.
+
+---
+
+## 10. Production Deployment Guide
+
+Deploying separately (Vercel for Next.js frontend, Render for Express backend) is recommended because the Express API maintains persistent TCP connection pools to MongoDB Atlas, while Next.js leverages Vercel's edge network:
+
+### Backend API (Render Web Service)
+- **Repository Root:** `.` (monorepo root)
+- **Runtime:** `Node`
+- **Build Command:** `npm install --include=dev && npm run build:api`
+- **Start Command:** `node apps/api/dist/server.js`
+- **Health Check Path:** `/api/health`
+- **Environment Variables:**
+  - `NODE_ENV=production`
+  - `PORT=10000`
+  - `DATABASE_URL` (MongoDB Atlas connection string)
+  - `JWT_ACCESS_SECRET` & `JWT_REFRESH_SECRET`
+  - `CLIENT_URL=https://<your-app>.vercel.app`
+
+### Frontend Web (Vercel)
+- **Framework Preset:** `Next.js`
+- **Root Directory:** `apps/web`
+- **Build Command (Override):** `cd ../.. && npm install && npm run build:web`
+- **Output Directory:** `.next`
+- **Environment Variables:**
+  - `NEXT_PUBLIC_API_URL=https://<your-render-url>.onrender.com/api/v1`
+  - `NEXT_PUBLIC_GEOAPIFY_API_KEY=<your-geoapify-key>`
+

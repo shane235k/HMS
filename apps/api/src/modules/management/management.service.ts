@@ -235,7 +235,7 @@ export class ManagementService {
       select: { id: true, room_number: true, floor: true, operational_status: true },
     });
 
-    const roomStatusCounts = {
+    const roomStatusCounts: Record<string, number> = {
       READY: 0,
       OCCUPIED: 0,
       DIRTY: 0,

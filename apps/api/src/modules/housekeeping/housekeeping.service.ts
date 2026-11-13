@@ -24,7 +24,7 @@ export class HousekeepingService {
       select: { operational_status: true },
     });
 
-    const roomStatusCounts = {
+    const roomStatusCounts: Record<string, number> = {
       READY: 0,
       OCCUPIED: 0,
       DIRTY: 0,
@@ -44,7 +44,7 @@ export class HousekeepingService {
       select: { status: true },
     });
 
-    const taskStatusCounts = {
+    const taskStatusCounts: Record<string, number> = {
       PENDING: 0,
       IN_PROGRESS: 0,
       AWAITING_INSPECTION: 0,
