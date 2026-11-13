@@ -393,6 +393,7 @@ export default function CheckoutPage() {
                       </label>
                       <Input
                         type="password"
+                        showPasswordToggle={false}
                         maxLength={4}
                         value={cvv}
                         onChange={(e) => setCvv(e.target.value)}
