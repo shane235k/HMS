@@ -21,14 +21,55 @@ import notificationRoutes from './modules/notifications/notifications.routes';
 export const createApp = (): Application => {
   const app = express();
 
+  // Allowed CORS origins
+  const allowedOrigins = new Set<string>([
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+    'https://hms235t.vercel.app',
+  ]);
+
+  if (env.CLIENT_URL) {
+    env.CLIENT_URL.split(',').forEach((url) => {
+      const trimmed = url.trim().replace(/\/$/, '');
+      if (trimmed) allowedOrigins.add(trimmed);
+    });
+  }
+
+  const corsOptions: cors.CorsOptions = {
+    origin: (requestOrigin, callback) => {
+      // Allow requests with no origin (mobile apps, server-to-server, curl, tests)
+      if (!requestOrigin) {
+        return callback(null, true);
+      }
+
+      const normalized = requestOrigin.replace(/\/$/, '');
+
+      // Check exact match or any *.vercel.app domain
+      if (
+        allowedOrigins.has(normalized) ||
+        normalized.endsWith('.vercel.app') ||
+        normalized.includes('localhost:')
+      ) {
+        return callback(null, true);
+      }
+
+      return callback(null, false);
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Cookie'],
+    exposedHeaders: ['Set-Cookie'],
+  };
+
   // Security & utility middleware
-  app.use(helmet());
   app.use(
-    cors({
-      origin: [env.CLIENT_URL, 'http://localhost:3000'],
-      credentials: true,
+    helmet({
+      crossOriginResourcePolicy: { policy: 'cross-origin' },
     })
   );
+  app.use(cors(corsOptions));
+  app.options('*', cors(corsOptions));
+
   app.use(morgan(env.NODE_ENV === 'development' ? 'dev' : 'combined'));
   app.use(express.json());
   app.use(cookieParser());
@@ -59,4 +100,3 @@ export const createApp = (): Application => {
 
   return app;
 };
-
