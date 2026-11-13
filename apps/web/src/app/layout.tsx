@@ -1,6 +1,7 @@
 // apps/web/src/app/layout.tsx
 import type { Metadata } from 'next';
 import './globals.css';
+import 'maplibre-gl/dist/maplibre-gl.css';
 import { AuthProvider } from '@/lib/authContext';
 
 export const metadata: Metadata = {

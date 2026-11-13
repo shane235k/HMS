@@ -3,7 +3,6 @@
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import * as maplibregl from 'maplibre-gl';
-import 'maplibre-gl/dist/maplibre-gl.css';
 
 // Ensure MapLibre Web Worker loads reliably in Next.js/Webpack environment
 if (typeof window !== 'undefined') {

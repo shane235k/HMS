@@ -3,7 +3,6 @@
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import * as maplibregl from 'maplibre-gl';
-import 'maplibre-gl/dist/maplibre-gl.css';
 import { MapPin, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
 
 // Ensure MapLibre Web Worker loads reliably in Next.js environment
