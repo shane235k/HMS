@@ -94,6 +94,25 @@ export class ManagementController {
       next(error);
     }
   }
+
+  async getTransactions(req: Request, res: Response, next: NextFunction) {
+    try {
+      const hotelId = (req as any).resolvedHotelId;
+      const { page, limit, filter, search } = req.query;
+      const data = await managementService.getHotelTransactions(hotelId, {
+        page: page ? Number(page) : undefined,
+        limit: limit ? Number(limit) : undefined,
+        filter: filter as string | undefined,
+        search: search as string | undefined,
+      });
+      res.status(200).json({
+        success: true,
+        data,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 export const managementController = new ManagementController();

@@ -22,6 +22,10 @@ import {
   Phone,
   FileText,
   Clock,
+  Image as ImageIcon,
+  UploadCloud,
+  Link as LinkIcon,
+  Trash2,
 } from 'lucide-react';
 
 interface CityPreset {
@@ -126,6 +130,11 @@ export const RegisterPropertyView: React.FC<RegisterPropertyViewProps> = ({
   const [checkInTime, setCheckInTime] = useState('14:00');
   const [checkOutTime, setCheckOutTime] = useState('11:00');
   const [description, setDescription] = useState('');
+  const [coverImage, setCoverImage] = useState<string>('');
+  const [uploadingImage, setUploadingImage] = useState<boolean>(false);
+  const [imageUploadError, setImageUploadError] = useState<string | null>(null);
+  const [imageInputMode, setImageInputMode] = useState<'upload' | 'url'>('upload');
+  const [urlInput, setUrlInput] = useState<string>('');
 
   // Coordinates State (supports Map, Current Location, and Direct Inputs)
   const [latitude, setLatitude] = useState('28.6139');
@@ -210,6 +219,72 @@ export const RegisterPropertyView: React.FC<RegisterPropertyViewProps> = ({
   const selectedCountry =
     COUNTRY_PHONE_CODES.find((c) => c.iso === selectedCountryCode) || COUNTRY_PHONE_CODES[0];
 
+  // Image Upload Handlers
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setImageUploadError('Please select a valid image file (JPEG, PNG, WebP, AVIF).');
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      setImageUploadError('Image file size exceeds the 10MB limit. Please upload an image under 10MB.');
+      return;
+    }
+
+    setImageUploadError(null);
+    setUploadingImage(true);
+
+    try {
+      const reader = new FileReader();
+      reader.onload = async () => {
+        try {
+          const base64Data = reader.result as string;
+          const res = await apiFetch<any>('/applications/upload-image', {
+            method: 'POST',
+            body: JSON.stringify({
+              imageBase64: base64Data,
+              filename: file.name,
+            }),
+          });
+          if (res?.data?.url) {
+            setCoverImage(res.data.url);
+          } else if (res?.url) {
+            setCoverImage(res.url);
+          } else {
+            setCoverImage(base64Data);
+          }
+        } catch (err: any) {
+          setImageUploadError(err.message || 'Image upload failed. You can also paste an image URL directly.');
+        } finally {
+          setUploadingImage(false);
+        }
+      };
+      reader.onerror = () => {
+        setImageUploadError('Error reading file from disk. Please try another image.');
+        setUploadingImage(false);
+      };
+      reader.readAsDataURL(file);
+    } catch (err: any) {
+      setImageUploadError(err.message || 'Image upload error');
+      setUploadingImage(false);
+    }
+  };
+
+  const handleApplyUrl = () => {
+    if (!urlInput.trim()) return;
+    setCoverImage(urlInput.trim());
+    setImageUploadError(null);
+  };
+
+  const handleRemoveImage = () => {
+    setCoverImage('');
+    setUrlInput('');
+    setImageUploadError(null);
+  };
+
   // Submission handler
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -257,6 +332,7 @@ export const RegisterPropertyView: React.FC<RegisterPropertyViewProps> = ({
           checkInTime: checkInTime.trim() || '14:00',
           checkOutTime: checkOutTime.trim() || '11:00',
           description: description.trim() || undefined,
+          coverImage: coverImage.trim() || undefined,
         }),
       });
 
@@ -460,7 +536,153 @@ export const RegisterPropertyView: React.FC<RegisterPropertyViewProps> = ({
               </div>
             </Card>
 
-            {/* SECTION 2: LEGAL & REGULATORY DOSSIER */}
+            {/* SECTION 2: PROPERTY THUMBNAIL & COVER PHOTOGRAPHY */}
+            <Card className="p-6 bg-white border-charcoal-200 shadow-sm space-y-5">
+              <div className="flex items-center justify-between border-b border-charcoal-100 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-7 h-7 rounded-lg bg-neutral-100 flex items-center justify-center text-neutral-800">
+                    <ImageIcon className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-normal text-neutral-900">Property Thumbnail & Cover Photography</h3>
+                    <p className="text-[11px] text-neutral-400 font-normal">
+                      Upload your official property cover photo for search listings and property profile
+                    </p>
+                  </div>
+                </div>
+
+                {coverImage && (
+                  <Badge variant="approved" className="font-mono text-[10px] gap-1 font-normal">
+                    <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                    Cover Attached
+                  </Badge>
+                )}
+              </div>
+
+              {/* Mode Selector Tabs: Upload File or Image URL */}
+              <div className="flex items-center gap-1.5 p-1 bg-neutral-100/80 rounded-xl border border-neutral-200 text-xs font-mono max-w-xs">
+                <button
+                  type="button"
+                  onClick={() => setImageInputMode('upload')}
+                  className={`flex-1 py-1.5 px-3 rounded-lg flex items-center justify-center gap-1.5 transition-all ${
+                    imageInputMode === 'upload'
+                      ? 'bg-white text-neutral-900 shadow-xs font-normal'
+                      : 'text-neutral-500 hover:text-neutral-900'
+                  }`}
+                >
+                  <UploadCloud className="w-3.5 h-3.5" />
+                  <span>Upload File</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setImageInputMode('url')}
+                  className={`flex-1 py-1.5 px-3 rounded-lg flex items-center justify-center gap-1.5 transition-all ${
+                    imageInputMode === 'url'
+                      ? 'bg-white text-neutral-900 shadow-xs font-normal'
+                      : 'text-neutral-500 hover:text-neutral-900'
+                  }`}
+                >
+                  <LinkIcon className="w-3.5 h-3.5" />
+                  <span>Image URL</span>
+                </button>
+              </div>
+
+              {/* Mode 1: File Upload */}
+              {imageInputMode === 'upload' && (
+                <div className="space-y-3">
+                  <label className="relative border-2 border-dashed border-neutral-200 hover:border-black rounded-2xl p-6 flex flex-col items-center justify-center cursor-pointer transition-colors bg-neutral-50/50 hover:bg-neutral-50 group">
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp,image/avif"
+                      onChange={handleFileUpload}
+                      disabled={uploadingImage}
+                      className="hidden"
+                    />
+                    <div className="w-10 h-10 rounded-xl bg-white border border-neutral-200 flex items-center justify-center text-neutral-700 shadow-2xs group-hover:scale-105 transition-transform mb-2">
+                      <UploadCloud className={`w-5 h-5 ${uploadingImage ? 'animate-bounce text-neutral-900' : ''}`} />
+                    </div>
+                    <p className="text-xs font-normal text-neutral-900 text-center">
+                      {uploadingImage ? 'Uploading and optimizing image asset...' : 'Click to select or drag & drop property cover photo'}
+                    </p>
+                    <p className="text-[10px] text-neutral-400 font-mono mt-1 text-center">
+                      PNG, JPG, WebP or AVIF up to 10MB (recommended landscape 16:9)
+                    </p>
+                  </label>
+                </div>
+              )}
+
+              {/* Mode 2: Direct Image URL */}
+              {imageInputMode === 'url' && (
+                <div className="space-y-3">
+                  <div className="flex gap-2">
+                    <input
+                      type="url"
+                      placeholder="e.g. https://your-domain.com/hotel-exterior.jpg"
+                      value={urlInput}
+                      onChange={(e) => setUrlInput(e.target.value)}
+                      className="flex-1 px-3.5 py-2 text-xs rounded-xl bg-white border border-neutral-200 text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:border-black font-mono font-normal"
+                    />
+                    <Button
+                      type="button"
+                      variant="primary"
+                      size="sm"
+                      onClick={handleApplyUrl}
+                      disabled={!urlInput.trim()}
+                      className="text-xs font-normal px-4"
+                    >
+                      Apply
+                    </Button>
+                  </div>
+                  <p className="text-[10px] text-neutral-400 font-mono">
+                    Enter the direct URL of your property photo
+                  </p>
+                </div>
+              )}
+
+              {/* Upload Error Banner */}
+              {imageUploadError && (
+                <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-xs text-red-700 flex items-center gap-2 font-normal">
+                  <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+                  <span>{imageUploadError}</span>
+                </div>
+              )}
+
+              {/* Active Cover Preview Box */}
+              {coverImage ? (
+                <div className="rounded-2xl border border-charcoal-200 overflow-hidden bg-neutral-50 p-3 space-y-3">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-mono text-[11px] text-neutral-600">
+                      Active Search Thumbnail
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleRemoveImage}
+                      className="text-red-600 hover:text-red-700 font-mono text-[11px] flex items-center gap-1 transition-colors"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                      Remove
+                    </button>
+                  </div>
+
+                  <div className="relative h-48 w-full rounded-xl overflow-hidden border border-neutral-200 bg-black/5">
+                    <img
+                      src={coverImage}
+                      alt="Property Cover Preview"
+                      className="w-full h-full object-cover"
+                    />
+                    <div className="absolute bottom-2.5 left-2.5 bg-black/70 backdrop-blur-xs text-white text-[10px] font-mono px-2.5 py-1 rounded-lg truncate max-w-[85%]">
+                      {coverImage}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-[11px] text-neutral-400 font-mono italic">
+                  No image selected yet. Upload your property cover photo above.
+                </div>
+              )}
+            </Card>
+
+            {/* SECTION 3: LEGAL & REGULATORY DOSSIER */}
             <Card className="p-6 bg-white border-charcoal-200 shadow-sm space-y-5">
               <div className="flex items-center gap-2.5 border-b border-charcoal-100 pb-3">
                 <div className="w-7 h-7 rounded-lg bg-neutral-100 flex items-center justify-center text-neutral-800">
@@ -740,6 +962,26 @@ export const RegisterPropertyView: React.FC<RegisterPropertyViewProps> = ({
                   Pending Verification
                 </Badge>
               </div>
+
+              {/* Hotel Thumbnail Image Preview */}
+              {coverImage ? (
+                <div className="relative h-48 w-full rounded-2xl overflow-hidden border border-neutral-200 shadow-xs bg-neutral-100 group">
+                  <img
+                    src={coverImage}
+                    alt={hotelName || 'Property Thumbnail'}
+                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                  />
+                  <div className="absolute top-2.5 left-2.5 bg-black/60 backdrop-blur-xs text-white text-[10px] font-mono px-2 py-0.5 rounded-full uppercase tracking-wider">
+                    Primary Thumbnail
+                  </div>
+                </div>
+              ) : (
+                <div className="h-32 w-full rounded-2xl border-2 border-dashed border-neutral-200 flex flex-col items-center justify-center text-neutral-400 gap-1.5 bg-neutral-50/60">
+                  <ImageIcon className="w-6 h-6 text-neutral-300" />
+                  <span className="text-[11px] font-mono text-neutral-400">Search Thumbnail Preview</span>
+                  <span className="text-[10px] text-neutral-400">Select or upload an image on the left</span>
+                </div>
+              )}
 
               <div className="space-y-3">
                 <div>

@@ -62,23 +62,30 @@ HMS/
 
 ---
 
-## 4. Quick Start & Local Setup
+## 4. Complete Lifecycle Guide: Setup & Execution
 
 ### Prerequisites
-- **Node.js** `v18+` (Tested on `v20.x` and `v22.x`)
-- **npm** `v10+`
-- **MongoDB Atlas** cluster connection string (Free M0 Sandbox or any replica set URI)
+- **Node.js**: `v18+` (Tested on `v20.x` and `v22.x`)
+- **npm**: `v10+`
+- **MongoDB Atlas**: Active cluster connection URI with replica set enabled (MongoDB Atlas M0 Free Tier or higher, required for Prisma multi-document transactions)
 
-### 1. Clone & Configure Environment
+---
+
+### Step 1: Clone Repository
 ```bash
 git clone <repository-url>
 cd HMS
+```
 
-# Create root environment configuration
+---
+
+### Step 2: Environment Configuration
+Create the root environment configuration:
+```bash
 cp .env.example .env
 ```
 
-Edit `.env` and supply your MongoDB Atlas connection string:
+Configure `.env` in the repository root:
 ```env
 PORT=5000
 DATABASE_URL="mongodb+srv://<username>:<password>@<cluster>.mongodb.net/hotel_management?retryWrites=true&w=majority"
@@ -90,61 +97,132 @@ CLIENT_URL="http://localhost:3000"
 NEXT_PUBLIC_GEOAPIFY_API_KEY=""
 ```
 
-Create `apps/web/.env.local`:
+Create and configure `apps/web/.env.local`:
 ```env
 NEXT_PUBLIC_API_URL="http://localhost:5000/api/v1"
 NEXT_PUBLIC_GEOAPIFY_API_KEY=""
 ```
 
-### 2. Install Dependencies & Build Packages
+---
+
+### Step 3: Install Dependencies
+Install all workspace dependencies from the root:
 ```bash
 npm install
+```
+
+---
+
+### Step 4: Build Monorepo Packages
+Compile the internal shared packages (`@hbms/shared` and `@hbms/database`):
+```bash
 npm run build:packages
 ```
 
-### 3. Initialize Database Schema & Run the Sole Seed Script
-```bash
-# Push Prisma schema to MongoDB Atlas
-npm run db:push
+---
 
-# Run the single authoritative seed script (seeds users, hotels, rooms, stays, reviews & indexes)
+### Step 5: Push Database Schema & Reconcile Indexes
+Sync the Prisma schema directly to MongoDB Atlas:
+```bash
+npm run db:push
+```
+
+---
+
+### Step 6: Seed Database
+Execute the sole, authoritative database seed file ([`packages/database/prisma/seed.ts`](packages/database/prisma/seed.ts)):
+```bash
 npm run db:seed
 ```
 
 > [!NOTE]
-> `npm run db:seed` executes the sole database seed file ([`packages/database/prisma/seed.ts`](packages/database/prisma/seed.ts)). It automatically creates all demo accounts, approved hotels, room types, rate plans, physical rooms, completed stays, verified reviews, and reconciles the MongoDB Atlas 2dsphere geospatial indexes.
-
-### 4. Run Development Servers
-```bash
-# Run both Backend API and Frontend Web client concurrently:
-npm run dev
-
-# Or run separately:
-npm run dev:api    # Express API on http://localhost:5000
-npm run dev:web    # Next.js Web Client on http://localhost:3000
-```
-
-Open **[http://localhost:3000](http://localhost:3000)** in your browser.
+> `npm run db:seed` clears all old collections and populates:
+> - **Platform Admin** and all staff accounts for **5 international hotels** (Managers, Receptionists, and Housekeeping).
+> - **5 Approved Hotel Properties**: Paris, Tokyo, Bali, New York, and Dubai with GeoJSON location coordinates.
+> - **15 Room Types**: 3 distinct classes per hotel with verified local image collages (`/images/rooms/...`).
+> - **49 Physical Rooms** initialized to `READY` status with floor mappings.
+> - **Commercial Rate Plans**: Best available flexible rates and curated breakfast/spa packages with descriptions.
+> - **Sole Guest Account**: `test1@mail.com` (**TEST ONE**) with exactly 1 completed unrated stay (`RES-PARIS-TEST1-101`) to test verified checkout notifications and rating workflows.
+> - **MongoDB 2dsphere Indexes**: Geospatial indexing on `Hotel.location` for globe and radius queries.
 
 ---
 
-## 5. Seeded Demo Accounts
+### Step 7: Run Development Servers
+Start both the Express API and Next.js web application concurrently:
+```bash
+npm run dev
+```
 
-All seeded credentials configured in [`packages/database/prisma/seed.ts`](packages/database/prisma/seed.ts):
+Or run each service in independent terminal sessions:
+```bash
+# Terminal 1: Express REST API (Runs on port 5000)
+npm run dev:api
 
+# Terminal 2: Next.js Web Application (Runs on port 3000)
+npm run dev:web
+```
+
+Access the web interface at **[http://localhost:3000](http://localhost:3000)** and the API health check at **[http://localhost:5000/api/health](http://localhost:5000/api/health)**.
+
+---
+
+### Step 8: Run Automated Test Suites
+Execute the full integration test suite across all 6 test modules:
+```bash
+npm run test
+```
+
+---
+
+### Step 9: Production Build
+Compile both applications for production deployment:
+```bash
+npm run build
+```
+
+---
+
+## 5. Seeded Demo Accounts & Credentials
+
+All seeded credentials configured in the authoritative seed script ([`packages/database/prisma/seed.ts`](packages/database/prisma/seed.ts)):
+
+### Platform Administration
 | Role | Email Address | Password | Permissions & Property Scope |
 |------|---------------|----------|-------------------------------|
-| **Platform Admin** | `admin@hbms.com` | `Admin123!` | Global platform governance, hotel approvals, suspensions, and audit logs |
-| **Hotel Manager (Paris)** | `m1@mail.com` | `123456789` | **Le Grand Luxe Paris**: inventory, rate calendar, staff, and financial dashboard |
-| **Hotel Manager (Alt)** | `manager.paris@grandluxe.com` | `Manager123!` | Le Grand Luxe Paris (alternate login) |
-| **Front Desk Reception** | `receptionist.paris@grandluxe.com` | `Staff123!` | Le Grand Luxe Paris: check-in, check-out, room allocation, walk-ins |
-| **Housekeeping** | `housekeeping.paris@grandluxe.com` | `Staff123!` | Le Grand Luxe Paris: turnover cleaning queue, inspection requests |
-| **Guest (Unrated Paris Stay)** | `test2@mail.com` | `123456789` | Completed stay in Paris (Deluxe Tuileries Room); unrated with active notification to test and demonstrate rating modal |
-| **Guest (Verified Paris Stay)** | `guest.sophia@example.com` | `Guest123!` | Completed stay in Paris (Royal Palais Suite), verified 5★ review showcase |
-| **Guest (Verified Tokyo Stay)** | `test1@mail.com` | `123456789` | Completed stay in Tokyo (Modern Ginza Studio), verified review |
-| **Guest (Verified Bali Stay)** | `test3@mail.com` | `123456789` | Completed stay in Bali (Oceanfront Cliffside Villa) |
-| **Guest (Verified Dubai Stay)** | `test4@mail.com` | `123456789` | Completed stay in Dubai (Royal Palm Beach Villa), verified review |
-| **Standard Guest** | `guest.sophia@example.com` | `Guest123!` | Consumer discovery, search, temporary holds, and reservations |
+| **Platform Admin** | `admin@hbms.com` | `Admin123!` | Global platform governance, hotel applications, property suspensions & audit logs |
+
+### Hotel Managers (5 Properties)
+| Property | Manager Email | Password | Scope & Responsibilities |
+|----------|---------------|----------|--------------------------|
+| **Le Grand Luxe Paris (Primary)** | `m1@mail.com` | `123456789` | Inventory, rate plans, staff management, and Paris revenue dashboard |
+| **Le Grand Luxe Paris (Alt)** | `manager.paris@grandluxe.com` | `Manager123!` | Le Grand Luxe Paris alternate manager credentials |
+| **Sakura Boutique Hotel Tokyo** | `manager.tokyo@sakura.com` | `Manager123!` | Tokyo property management & revenue analytics |
+| **Azure Haven Resort Bali** | `manager.bali@azurehaven.com` | `Manager123!` | Bali resort operations & commercial rate plans |
+| **The Manhattan Executive Suites NY** | `manager.ny@manhattan.com` | `Manager123!` | New York property management & night audit |
+| **Emirates Mirage Palace Dubai** | `manager.dubai@palace.com` | `Manager123!` | Dubai luxury palace management & occupancy metrics |
+
+### Front Desk Receptionists (5 Properties)
+| Property | Receptionist Email | Password | Operational Scope |
+|----------|--------------------|----------|-------------------|
+| **Le Grand Luxe Paris** | `receptionist.paris@grandluxe.com` | `Staff123!` | Check-in, check-out, room allocation, walk-in reservations, audit trails |
+| **Sakura Boutique Hotel Tokyo** | `receptionist.tokyo@sakura.com` | `Staff123!` | Tokyo arrival & departure roster, room keys |
+| **Azure Haven Resort Bali** | `receptionist.bali@azurehaven.com` | `Staff123!` | Bali arrival & departure roster, room allocation |
+| **The Manhattan Executive Suites NY** | `receptionist.ny@manhattan.com` | `Staff123!` | New York front desk operations, walk-in bookings |
+| **Emirates Mirage Palace Dubai** | `receptionist.dubai@palace.com` | `Staff123!` | Dubai front desk arrivals, guest checkout, departures |
+
+### Housekeeping Operations (5 Properties)
+| Property | Housekeeper Email | Password | Operational Scope |
+|----------|-------------------|----------|-------------------|
+| **Le Grand Luxe Paris** | `housekeeping.paris@grandluxe.com` | `Staff123!` | Paris turnover cleaning queue, inspection submissions |
+| **Sakura Boutique Hotel Tokyo** | `housekeeping.tokyo@sakura.com` | `Staff123!` | Tokyo room cleaning queue, room condition reporting |
+| **Azure Haven Resort Bali** | `housekeeping.bali@azurehaven.com` | `Staff123!` | Bali villa turnover cleaning, maintenance issue reporting |
+| **The Manhattan Executive Suites NY** | `housekeeping.ny@manhattan.com` | `Staff123!` | New York suite turnover cleaning & inspection workflow |
+| **Emirates Mirage Palace Dubai** | `housekeeping.dubai@palace.com` | `Staff123!` | Dubai palace turnover cleaning & inspection workflow |
+
+### Sole Guest Account & Historical Stay Record
+| Role | Email Address | Password | Guest Name | Seeded Stay & Activity |
+|------|---------------|----------|------------|------------------------|
+| **Verified Guest** | `test1@mail.com` | `123456789` | **TEST ONE** | Completed stay `RES-PARIS-TEST1-101` at *Le Grand Luxe Paris* (Room 101, Nov 10–11, 2026; ₹28,000 paid). Unrated with active checkout notification to demonstrate rating modal. |
 
 ---
 

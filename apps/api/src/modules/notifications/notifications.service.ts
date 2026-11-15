@@ -43,20 +43,16 @@ export class NotificationsService {
       }),
     ]);
 
-    // Check which reservations or hotels have already been reviewed by this user
+    // Check which reservations have already been reviewed by this user
     const userReviews = await prisma.review.findMany({
       where: { user_id: userId },
-      select: { reservation_id: true, hotel_id: true },
+      select: { reservation_id: true },
     });
     const reviewedResIds = new Set(userReviews.map((r) => r.reservation_id).filter(Boolean));
-    const reviewedHotelIds = new Set(userReviews.map((r) => r.hotel_id));
 
     const enrichedNotifications = notifications.map((n) => {
       const resId = (n.metadata as any)?.reservationId;
-      const hotelId = (n.metadata as any)?.hotelId;
-      const isAlreadyReviewed = Boolean(
-        (resId && reviewedResIds.has(resId)) || (hotelId && reviewedHotelIds.has(hotelId))
-      );
+      const isAlreadyReviewed = Boolean(resId && reviewedResIds.has(resId));
       return {
         ...n,
         isReviewed: isAlreadyReviewed,

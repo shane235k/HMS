@@ -621,11 +621,18 @@ describe('Milestone 3: Reservation Lifecycle, Payments & Refunds', () => {
   });
 
   afterAll(async () => {
-    // Teardown: Clean up test reservations, payments, and refunds so they don't pollute live database
-    await prisma.refundRecord.deleteMany();
-    await prisma.cancellationRecord.deleteMany();
-    await prisma.payment.deleteMany();
-    await prisma.reservationRoom.deleteMany();
-    await prisma.reservation.deleteMany();
+    // Teardown: Clean up test reservations created during this test suite only
+    const testReservations = await prisma.reservation.findMany({
+      where: { guest_email: { in: ['guest.sophia@example.com', 'guest.lucas@example.com'] } },
+      select: { id: true },
+    });
+    const resIds = testReservations.map((r) => r.id);
+    if (resIds.length > 0) {
+      await prisma.refundRecord.deleteMany({ where: { reservation_id: { in: resIds } } });
+      await prisma.cancellationRecord.deleteMany({ where: { reservation_id: { in: resIds } } });
+      await prisma.payment.deleteMany({ where: { reservation_id: { in: resIds } } });
+      await prisma.reservationRoom.deleteMany({ where: { reservation_id: { in: resIds } } });
+      await prisma.reservation.deleteMany({ where: { id: { in: resIds } } });
+    }
   });
 });

@@ -24,6 +24,23 @@ function formatApplication(app: any) {
   const { hotels, ...rest } = app;
   const hotel = hotels && hotels.length > 0 ? hotels[0] : null;
 
+  let coverImage: string | null = app.cover_image || app.coverImage || null;
+  if (!coverImage && app.admin_notes && typeof app.admin_notes === 'string') {
+    try {
+      if (app.admin_notes.startsWith('{')) {
+        const parsed = JSON.parse(app.admin_notes);
+        if (parsed.coverImage) coverImage = parsed.coverImage;
+      }
+    } catch (_) {}
+  }
+
+  const images: string[] =
+    app.images && Array.isArray(app.images) && app.images.length > 0
+      ? app.images
+      : coverImage
+      ? [coverImage]
+      : [];
+
   const applicant = app.applicant
     ? {
         id: app.applicant.id,
@@ -75,6 +92,9 @@ function formatApplication(app: any) {
     checkOutTime: app.check_out_time || '11:00',
     check_out_time: app.check_out_time || '11:00',
     description: app.description,
+    coverImage,
+    cover_image: coverImage,
+    images,
     status: app.status,
     rejectionReason: app.rejection_reason ?? app.rejectionReason,
     rejection_reason: app.rejection_reason ?? app.rejectionReason,
@@ -123,6 +143,15 @@ export class ApplicationsService {
       data: { role: Role.HOTEL_MANAGER },
     });
 
+    const initialCoverImage =
+      (input as any).coverImage ||
+      ((input as any).images && (input as any).images.length > 0 ? (input as any).images[0] : undefined);
+
+    let initialAdminNotes: string | undefined = undefined;
+    if (initialCoverImage) {
+      initialAdminNotes = JSON.stringify({ coverImage: initialCoverImage });
+    }
+
     const application = await prisma.hotelApplication.create({
       data: {
         applicant_user_id: applicantUserId,
@@ -143,6 +172,7 @@ export class ApplicationsService {
         check_out_time: input.checkOutTime || '11:00',
         description: input.description,
         status: ApplicationStatus.PENDING,
+        admin_notes: initialAdminNotes,
       },
       include: {
         applicant: {
@@ -150,6 +180,27 @@ export class ApplicationsService {
         },
       },
     });
+
+    if (initialCoverImage) {
+      try {
+        await prisma.$runCommandRaw({
+          update: 'HotelApplication',
+          updates: [
+            {
+              q: { _id: { $oid: application.id } },
+              u: {
+                $set: {
+                  cover_image: initialCoverImage,
+                  images: [initialCoverImage],
+                },
+              },
+            },
+          ],
+        });
+      } catch (rawErr) {
+        console.error('Failed to update raw cover_image on HotelApplication:', rawErr);
+      }
+    }
 
     await logAuditEvent({
       actorId: applicantUserId,
@@ -253,14 +304,45 @@ export class ApplicationsService {
         uniqueSlug = `${baseSlug}-${counter++}`;
       }
 
+      // Extract coverImage from application
+      let coverImage: string | undefined = undefined;
+      if (application.admin_notes && typeof application.admin_notes === 'string') {
+        try {
+          if (application.admin_notes.startsWith('{')) {
+            const parsed = JSON.parse(application.admin_notes);
+            if (parsed.coverImage) coverImage = parsed.coverImage;
+          }
+        } catch (_) {}
+      }
+
+      if (!coverImage) {
+        try {
+          const rawDoc = (await prisma.$runCommandRaw({
+            find: 'HotelApplication',
+            filter: { _id: { $oid: applicationId } },
+            limit: 1,
+          })) as any;
+          const first = rawDoc?.cursor?.firstBatch?.[0];
+          if (first?.cover_image) {
+            coverImage = first.cover_image;
+          } else if (first?.images && first.images.length > 0) {
+            coverImage = first.images[0];
+          }
+        } catch (_) {}
+      }
+
       // Execute approval atomically in database transaction
       const result = await prisma.$transaction(async (tx) => {
         // 1. Update application status
+        const preservedNotes = input.adminNotes
+          ? (coverImage ? JSON.stringify({ coverImage, adminNotes: input.adminNotes }) : input.adminNotes)
+          : application.admin_notes;
+
         const updatedApp = await tx.hotelApplication.update({
           where: { id: applicationId },
           data: {
             status: ApplicationStatus.APPROVED,
-            admin_notes: input.adminNotes,
+            admin_notes: preservedNotes,
             reviewed_by_id: adminUserId,
             reviewed_at: new Date(),
           },
@@ -289,6 +371,7 @@ export class ApplicationsService {
             longitude: application.longitude,
             phone: application.contact_phone,
             email: application.contact_email,
+            images: coverImage ? [coverImage] : [],
             status: HotelStatus.ACTIVE,
             currency: 'INR',
             check_in_time: application.check_in_time || '14:00',

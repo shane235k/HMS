@@ -39,7 +39,7 @@ export class ReceptionService {
           gte: targetDate,
           lt: nextDate,
         },
-        status: { in: [ReservationStatus.CONFIRMED, ReservationStatus.CHECKED_IN] },
+        status: { in: [ReservationStatus.CONFIRMED, ReservationStatus.CHECKED_IN, ReservationStatus.CHECKED_OUT] },
       },
       include: {
         rooms: {
@@ -47,7 +47,7 @@ export class ReceptionService {
             room_type: { select: { id: true, name: true, bed_type: true } },
             rate_plan: { select: { id: true, name: true } },
             assignments: {
-              where: { status: AssignmentStatus.ACTIVE },
+              orderBy: { assigned_at: 'desc' },
               include: {
                 room: { select: { id: true, room_number: true, floor: true, operational_status: true } },
               },
@@ -85,7 +85,7 @@ export class ReceptionService {
             room_type: { select: { id: true, name: true } },
             rate_plan: { select: { id: true, name: true } },
             assignments: {
-              where: { status: AssignmentStatus.ACTIVE },
+              orderBy: { assigned_at: 'desc' },
               include: {
                 room: { select: { id: true, room_number: true, floor: true, operational_status: true } },
               },
@@ -163,7 +163,7 @@ export class ReceptionService {
             room_type: { select: { id: true, name: true } },
             rate_plan: { select: { id: true, name: true } },
             assignments: {
-              where: { status: AssignmentStatus.ACTIVE },
+              orderBy: { assigned_at: 'desc' },
               include: {
                 room: { select: { id: true, room_number: true, floor: true, operational_status: true } },
               },
@@ -198,7 +198,7 @@ export class ReceptionService {
             room_type: { select: { id: true, name: true } },
             rate_plan: { select: { id: true, name: true } },
             assignments: {
-              where: { status: AssignmentStatus.ACTIVE },
+              orderBy: { assigned_at: 'desc' },
               include: {
                 room: { select: { id: true, room_number: true, floor: true, operational_status: true } },
               },
@@ -527,7 +527,10 @@ export class ReceptionService {
       // Update reservation status
       const updatedRes = await tx.reservation.update({
         where: { id: reservation.id },
-        data: { status: ReservationStatus.CHECKED_IN },
+        data: {
+          status: ReservationStatus.CHECKED_IN,
+          checked_in_at: new Date(),
+        },
         include: {
           rooms: {
             include: {
@@ -625,7 +628,10 @@ export class ReceptionService {
       // 4. Update reservation status to CHECKED_OUT
       const updatedRes = await tx.reservation.update({
         where: { id: reservation.id },
-        data: { status: ReservationStatus.CHECKED_OUT },
+        data: {
+          status: ReservationStatus.CHECKED_OUT,
+          checked_out_at: new Date(),
+        },
       });
 
       // 5. Audit Log

@@ -36,8 +36,13 @@ interface HousekeepingMetrics {
   inspectionCount: number;
   readyCount: number;
   maintenanceCount: number;
-  openTasksCount: number;
-  completedTasksToday: number;
+  pendingCount?: number;
+  completedCount?: number;
+  openTasksCount?: number;
+  completedTasksToday?: number;
+  openMaintenanceCount?: number;
+  roomStatusCounts?: Record<string, number>;
+  taskStatusCounts?: Record<string, number>;
 }
 
 interface HousekeepingTask {
@@ -45,9 +50,11 @@ interface HousekeepingTask {
   type: string;
   status: string;
   notes?: string;
+  created_at?: string;
   started_at?: string;
   completed_at?: string;
   assigned_to?: { id: string; first_name: string; last_name: string };
+  inspected_by?: { id: string; first_name: string; last_name: string };
   room: {
     id: string;
     room_number: string;
@@ -77,7 +84,7 @@ export default function HousekeepingPage() {
   const [metrics, setMetrics] = useState<HousekeepingMetrics | null>(null);
   const [tasks, setTasks] = useState<HousekeepingTask[]>([]);
   const [maintenanceIssues, setMaintenanceIssues] = useState<MaintenanceIssue[]>([]);
-  const [activeQueue, setActiveQueue] = useState<'ALL' | 'DIRTY' | 'CLEANING' | 'INSPECTION' | 'MAINTENANCE'>('ALL');
+  const [activeQueue, setActiveQueue] = useState<'ALL' | 'DIRTY' | 'CLEANING' | 'INSPECTION' | 'COMPLETED' | 'MAINTENANCE'>('ALL');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
@@ -214,9 +221,10 @@ export default function HousekeepingPage() {
   // Filter tasks according to active queue
   const filteredTasks = tasks.filter((t) => {
     if (activeQueue === 'ALL') return true;
-    if (activeQueue === 'DIRTY') return t.room?.operational_status === 'DIRTY';
-    if (activeQueue === 'CLEANING') return t.room?.operational_status === 'CLEANING';
-    if (activeQueue === 'INSPECTION') return t.room?.operational_status === 'INSPECTION';
+    if (activeQueue === 'DIRTY') return t.status === 'PENDING';
+    if (activeQueue === 'CLEANING') return t.status === 'IN_PROGRESS';
+    if (activeQueue === 'INSPECTION') return t.status === 'AWAITING_INSPECTION';
+    if (activeQueue === 'COMPLETED') return t.status === 'COMPLETED';
     return true;
   });
 
@@ -287,64 +295,77 @@ export default function HousekeepingPage() {
             </div>
           )}
 
-          {/* 5 Real-Time Operational Queue Metric Cards */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+          {/* 6 Real-Time Operational Queue Metric Cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
             <Card
               className={`p-4 cursor-pointer transition-all ${
-                activeQueue === 'DIRTY' ? 'ring-2 ring-black bg-white' : 'bg-white hover:border-neutral-300'
+                activeQueue === 'DIRTY' ? 'ring-2 ring-black bg-white shadow-sm' : 'bg-white hover:border-neutral-300'
               }`}
               onClick={() => setActiveQueue('DIRTY')}
             >
               <span className="text-xs text-charcoal-500 font-medium">Dirty Rooms</span>
               <div className="text-2xl font-bold font-mono text-red-600 my-1">
-                {metrics?.dirtyCount || 0}
+                {metrics?.dirtyCount ?? metrics?.roomStatusCounts?.DIRTY ?? 0}
               </div>
               <span className="text-[11px] text-charcoal-400">Awaiting cleaner start</span>
             </Card>
 
             <Card
               className={`p-4 cursor-pointer transition-all ${
-                activeQueue === 'CLEANING' ? 'ring-2 ring-black bg-white' : 'bg-white hover:border-neutral-300'
+                activeQueue === 'CLEANING' ? 'ring-2 ring-black bg-white shadow-sm' : 'bg-white hover:border-neutral-300'
               }`}
               onClick={() => setActiveQueue('CLEANING')}
             >
               <span className="text-xs text-charcoal-500 font-medium">Cleaning In Progress</span>
               <div className="text-2xl font-bold font-mono text-amber-600 my-1">
-                {metrics?.cleaningCount || 0}
+                {metrics?.cleaningCount ?? metrics?.roomStatusCounts?.CLEANING ?? 0}
               </div>
               <span className="text-[11px] text-charcoal-400">Actively in service</span>
             </Card>
 
             <Card
               className={`p-4 cursor-pointer transition-all ${
-                activeQueue === 'INSPECTION' ? 'ring-2 ring-black bg-white' : 'bg-white hover:border-neutral-300'
+                activeQueue === 'INSPECTION' ? 'ring-2 ring-black bg-white shadow-sm' : 'bg-white hover:border-neutral-300'
               }`}
               onClick={() => setActiveQueue('INSPECTION')}
             >
               <span className="text-xs text-charcoal-500 font-medium">Inspection Queue</span>
               <div className="text-2xl font-bold font-mono text-indigo-600 my-1">
-                {metrics?.inspectionCount || 0}
+                {metrics?.inspectionCount ?? metrics?.roomStatusCounts?.INSPECTION ?? 0}
               </div>
               <span className="text-[11px] text-charcoal-400">Ready for supervisor sign-off</span>
+            </Card>
+
+            <Card
+              className={`p-4 cursor-pointer transition-all ${
+                activeQueue === 'COMPLETED' ? 'ring-2 ring-black bg-white shadow-sm' : 'bg-white hover:border-neutral-300'
+              }`}
+              onClick={() => setActiveQueue('COMPLETED')}
+            >
+              <span className="text-xs text-charcoal-500 font-medium">Completed Stays</span>
+              <div className="text-2xl font-bold font-mono text-emerald-600 my-1">
+                {metrics?.completedCount ?? metrics?.taskStatusCounts?.COMPLETED ?? 0}
+              </div>
+              <span className="text-[11px] text-charcoal-400">Finished stay turnovers</span>
             </Card>
 
             <Card className="p-4 bg-white">
               <span className="text-xs text-charcoal-500 font-medium">Ready for Guests</span>
               <div className="text-2xl font-bold font-mono text-emerald-600 my-1">
-                {metrics?.readyCount || 0}
+                {metrics?.readyCount ?? metrics?.roomStatusCounts?.READY ?? 0}
               </div>
               <span className="text-[11px] text-charcoal-400">Available for check-in</span>
             </Card>
 
             <Card
               className={`p-4 cursor-pointer transition-all ${
-                activeQueue === 'MAINTENANCE' ? 'ring-2 ring-black bg-white' : 'bg-white hover:border-neutral-300'
+                activeQueue === 'MAINTENANCE' ? 'ring-2 ring-black bg-white shadow-sm' : 'bg-white hover:border-neutral-300'
               }`}
               onClick={() => setActiveQueue('MAINTENANCE')}
             >
               <span className="text-xs text-charcoal-500 font-normal">Open Maintenance</span>
               <div className="text-2xl font-normal font-mono text-rose-600 my-1">
-                {metrics?.maintenanceCount || 0}
+                {metrics?.maintenanceCount ?? metrics?.openMaintenanceCount ?? 0}
               </div>
               <span className="text-[11px] text-charcoal-400">Damages or repairs</span>
             </Card>
@@ -352,23 +373,30 @@ export default function HousekeepingPage() {
 
           {/* Queue Filter Tabs */}
           <div className="flex items-center justify-between p-3 rounded-xl bg-white border border-charcoal-200">
-            <div className="flex items-center gap-2">
-              {(['ALL', 'DIRTY', 'CLEANING', 'INSPECTION', 'MAINTENANCE'] as const).map((tab) => (
+            <div className="flex flex-wrap items-center gap-2">
+              {[
+                { id: 'ALL', label: 'All Tasks' },
+                { id: 'DIRTY', label: 'Pending Clean' },
+                { id: 'CLEANING', label: 'In Progress' },
+                { id: 'INSPECTION', label: 'Awaiting Inspection' },
+                { id: 'COMPLETED', label: 'Completed Stays' },
+                { id: 'MAINTENANCE', label: 'Maintenance' },
+              ].map((tab) => (
                 <button
-                  key={tab}
-                  onClick={() => setActiveQueue(tab)}
+                  key={tab.id}
+                  onClick={() => setActiveQueue(tab.id as any)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-normal transition-all ${
-                    activeQueue === tab
+                    activeQueue === tab.id
                       ? 'bg-black text-white shadow-sm'
                       : 'text-charcoal-600 hover:bg-canvas-neutral'
                   }`}
                 >
-                  {tab === 'ALL' ? 'All Tasks' : tab}
+                  {tab.label}
                 </button>
               ))}
             </div>
 
-            <span className="text-xs text-charcoal-400 font-mono">
+            <span className="text-xs text-charcoal-400 font-mono hidden md:inline">
               Role: <span className="text-charcoal-800 font-normal">{user?.role}</span>
               {!canApproveInspection && ' (Cleaners require supervisor sign-off)'}
             </span>
@@ -424,105 +452,204 @@ export default function HousekeepingPage() {
                   No active cleaning tasks in this queue.
                 </Card>
               ) : (
-                filteredTasks.map((t) => (
-                  <Card
-                    key={t.id}
-                    className="p-4 bg-white border-charcoal-200 shadow-sm hover:border-neutral-200 transition-colors"
-                  >
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                      {/* Room & Status Info */}
-                      <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 rounded-xl bg-neutral-100 border border-neutral-200 flex flex-col items-center justify-center">
-                          <span className="text-[10px] text-charcoal-400 uppercase font-mono">Room</span>
-                          <span className="text-base font-normal font-mono text-black">
-                            {t.room?.room_number ?? 'N/A'}
-                          </span>
-                        </div>
+                filteredTasks.map((t) => {
+                  const resCodeMatch = t.notes?.match(/RES-[A-Za-z0-9-]+/i);
+                  const reservationCode = resCodeMatch ? resCodeMatch[0] : null;
+                  const isCompleted = t.status === 'COMPLETED';
+                  const isInProgress = t.status === 'IN_PROGRESS';
+                  const isAwaitingInspection = t.status === 'AWAITING_INSPECTION';
+                  const isPending = t.status === 'PENDING';
 
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-normal text-charcoal-900">
-                              {t.room?.room_type?.name || 'Standard'} (Floor {t.room?.floor ?? 1})
-                            </span>
-                            <Badge
-                              variant={
-                                t.room?.operational_status === 'READY'
-                                  ? 'approved'
-                                  : t.room?.operational_status === 'INSPECTION'
-                                  ? 'primary'
-                                  : t.room?.operational_status === 'CLEANING'
-                                  ? 'pending'
-                                  : 'rejected'
-                              }
-                              className="font-normal"
-                            >
-                              {t.room?.operational_status ?? 'DIRTY'}
-                            </Badge>
-                          </div>
-
-                          <div className="text-xs text-charcoal-500 flex items-center gap-3 font-mono font-normal">
-                            <span>Task: {t.type.replace('_', ' ')}</span>
-                            <span>•</span>
-                            <span>Status: {t.status}</span>
-                            {t.notes && <span>• Notes: {t.notes}</span>}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* State Transition Action Buttons */}
-                      <div className="flex items-center gap-2">
-                        {/* 1. If DIRTY: Start Cleaning */}
-                        {t.room?.operational_status === 'DIRTY' && (
-                          <Button
-                            variant="primary"
-                            size="sm"
-                            onClick={() => handleStartCleaning(t.id)}
-                            className="gap-1.5 text-xs font-normal"
-                          >
-                            <Play className="w-3.5 h-3.5" />
-                            <span>Start Cleaning</span>
-                          </Button>
-                        )}
-
-                        {/* 2. If CLEANING: Submit for Inspection */}
-                        {t.room?.operational_status === 'CLEANING' && (
-                          <Button
-                            variant="primary"
-                            size="sm"
-                            onClick={() => handleSubmitInspection(t.id)}
-                            className="gap-1.5 text-xs font-normal bg-amber-600 hover:bg-amber-700"
-                          >
-                            <ArrowRight className="w-3.5 h-3.5" />
-                            <span>Submit for Inspection</span>
-                          </Button>
-                        )}
-
-                        {/* 3. If INSPECTION: Approve & Mark READY (Role-Gated) */}
-                        {t.room?.operational_status === 'INSPECTION' && (
-                          <Button
-                            variant="primary"
-                            size="sm"
-                            disabled={!canApproveInspection}
-                            onClick={() => handleApproveInspection(t.id)}
-                            className={`gap-1.5 text-xs font-normal ${
-                              canApproveInspection
-                                ? 'bg-emerald-600 hover:bg-emerald-700 shadow-sm'
-                                : 'opacity-50 cursor-not-allowed bg-charcoal-400'
+                  return (
+                    <Card
+                      key={t.id}
+                      className={`p-4 transition-colors ${
+                        isCompleted
+                          ? 'bg-neutral-50/70 border-neutral-200 shadow-none'
+                          : 'bg-white border-charcoal-200 shadow-sm hover:border-neutral-300'
+                      }`}
+                    >
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        {/* Room & Status Info */}
+                        <div className="flex items-center gap-3">
+                          <div
+                            className={`w-12 h-12 rounded-xl border flex flex-col items-center justify-center ${
+                              isCompleted
+                                ? 'bg-emerald-50 border-emerald-200'
+                                : isInProgress
+                                ? 'bg-amber-50 border-amber-200'
+                                : isAwaitingInspection
+                                ? 'bg-indigo-50 border-indigo-200'
+                                : 'bg-red-50 border-red-200'
                             }`}
-                            title={
-                              canApproveInspection
-                                ? 'Approve room inspection and mark READY for check-in'
-                                : 'Supervisor inspection required (Managers, Receptionists, Admins only)'
-                            }
                           >
-                            <CheckCircle2 className="w-3.5 h-3.5" />
-                            <span>{canApproveInspection ? 'Approve & Mark READY' : 'Needs Supervisor'}</span>
-                          </Button>
-                        )}
+                            <span className="text-[10px] text-charcoal-400 uppercase font-mono">Room</span>
+                            <span className="text-base font-normal font-mono text-black">
+                              {t.room?.room_number ?? 'N/A'}
+                            </span>
+                          </div>
+
+                          <div className="space-y-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="text-xs font-medium text-charcoal-900">
+                                {t.room?.room_type?.name || 'Standard'} (Floor {t.room?.floor ?? 1})
+                              </span>
+
+                              {/* Primary Task Status Badge */}
+                              <Badge
+                                variant={
+                                  isCompleted
+                                    ? 'approved'
+                                    : isAwaitingInspection
+                                    ? 'primary'
+                                    : isInProgress
+                                    ? 'pending'
+                                    : 'rejected'
+                                }
+                                className="font-normal text-[11px]"
+                              >
+                                {isCompleted
+                                  ? 'COMPLETED'
+                                  : isAwaitingInspection
+                                  ? 'AWAITING INSPECTION'
+                                  : isInProgress
+                                  ? 'CLEANING IN PROGRESS'
+                                  : 'PENDING CLEAN'}
+                              </Badge>
+
+                              {/* Stay / Reservation Identification Pill */}
+                              {reservationCode && (
+                                <span className="text-[11px] font-mono font-medium px-2 py-0.5 rounded bg-blue-50 text-blue-800 border border-blue-200 flex items-center gap-1">
+                                  <span>Stay:</span>
+                                  <span className="font-bold">{reservationCode}</span>
+                                </span>
+                              )}
+
+                              {/* Current Physical Room State */}
+                              <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-neutral-100 text-charcoal-600 border border-neutral-200">
+                                Room currently: {t.room?.operational_status ?? 'UNKNOWN'}
+                              </span>
+                            </div>
+
+                            <div className="text-xs text-charcoal-500 flex flex-wrap items-center gap-2 font-mono font-normal">
+                              <span>Type: {t.type.replace('_', ' ')}</span>
+                              {t.notes && (
+                                <>
+                                  <span>•</span>
+                                  <span className="text-charcoal-600">{t.notes}</span>
+                                </>
+                              )}
+                              {t.assigned_to && (
+                                <>
+                                  <span>•</span>
+                                  <span>Cleaner: {t.assigned_to.first_name} {t.assigned_to.last_name}</span>
+                                </>
+                              )}
+                              {t.inspected_by && (
+                                <>
+                                  <span>•</span>
+                                  <span>Supervisor: {t.inspected_by.first_name} {t.inspected_by.last_name}</span>
+                                </>
+                              )}
+                            </div>
+
+                            {(t.created_at || t.started_at || t.completed_at) && (
+                              <div className="flex flex-wrap items-center gap-2 pt-1 text-[11px] font-mono">
+                                {t.created_at && (
+                                  <span
+                                    className="flex items-center gap-1 bg-neutral-100 text-charcoal-700 px-2 py-0.5 rounded border border-neutral-200"
+                                    title={`Created: ${new Date(t.created_at).toLocaleString()}`}
+                                  >
+                                    <Clock className="w-3 h-3 text-charcoal-500" />
+                                    <span>Created: {new Date(t.created_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}</span>
+                                  </span>
+                                )}
+                                {t.started_at && (
+                                  <span
+                                    className="flex items-center gap-1 bg-amber-50 text-amber-800 px-2 py-0.5 rounded border border-amber-200"
+                                    title={`Started: ${new Date(t.started_at).toLocaleString()}`}
+                                  >
+                                    <Play className="w-3 h-3 text-amber-600" />
+                                    <span>Started: {new Date(t.started_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}</span>
+                                  </span>
+                                )}
+                                {t.completed_at && (
+                                  <span
+                                    className="flex items-center gap-1 bg-emerald-50 text-emerald-800 px-2 py-0.5 rounded border border-emerald-200"
+                                    title={`Completed: ${new Date(t.completed_at).toLocaleString()}`}
+                                  >
+                                    <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                    <span>Completed: {new Date(t.completed_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}</span>
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* State Transition Action Buttons / Completed Identifier */}
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          {/* If COMPLETED: Display completed badge, NO action button */}
+                          {isCompleted && (
+                            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-medium">
+                              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                              <span>Completed Stay Turnover</span>
+                            </div>
+                          )}
+
+                          {/* 1. If PENDING: Start Cleaning */}
+                          {isPending && (
+                            <Button
+                              variant="primary"
+                              size="sm"
+                              onClick={() => handleStartCleaning(t.id)}
+                              className="gap-1.5 text-xs font-normal"
+                            >
+                              <Play className="w-3.5 h-3.5" />
+                              <span>Start Cleaning</span>
+                            </Button>
+                          )}
+
+                          {/* 2. If IN_PROGRESS: Submit for Inspection */}
+                          {isInProgress && (
+                            <Button
+                              variant="primary"
+                              size="sm"
+                              onClick={() => handleSubmitInspection(t.id)}
+                              className="gap-1.5 text-xs font-normal bg-amber-600 hover:bg-amber-700"
+                            >
+                              <ArrowRight className="w-3.5 h-3.5" />
+                              <span>Submit for Inspection</span>
+                            </Button>
+                          )}
+
+                          {/* 3. If AWAITING_INSPECTION: Approve & Mark READY (Role-Gated) */}
+                          {isAwaitingInspection && (
+                            <Button
+                              variant="primary"
+                              size="sm"
+                              disabled={!canApproveInspection}
+                              onClick={() => handleApproveInspection(t.id)}
+                              className={`gap-1.5 text-xs font-normal ${
+                                canApproveInspection
+                                  ? 'bg-emerald-600 hover:bg-emerald-700 shadow-sm'
+                                  : 'opacity-50 cursor-not-allowed bg-charcoal-400'
+                              }`}
+                              title={
+                                canApproveInspection
+                                  ? 'Approve room inspection and mark READY for check-in'
+                                  : 'Supervisor inspection required (Managers, Receptionists, Admins only)'
+                              }
+                            >
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              <span>{canApproveInspection ? 'Approve & Mark READY' : 'Needs Supervisor'}</span>
+                            </Button>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  </Card>
-                ))
+                    </Card>
+                  );
+                })
               )}
             </div>
           )}

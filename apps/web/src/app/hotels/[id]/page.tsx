@@ -133,6 +133,7 @@ export default function HotelAvailabilityPage() {
     reason?: string;
     hotelName?: string;
     reservationId?: string;
+    reservationCode?: string;
     roomTypeId?: string;
     stayDate?: string;
   } | null>(null);
@@ -157,7 +158,11 @@ export default function HotelAvailabilityPage() {
       return;
     }
     try {
-      const res = await apiFetch<any>(`/hotels/${hotelId}/review-eligibility`);
+      const resIdParam = searchParams.get('reservationId');
+      const url = resIdParam
+        ? `/hotels/${hotelId}/review-eligibility?reservationId=${encodeURIComponent(resIdParam)}`
+        : `/hotels/${hotelId}/review-eligibility`;
+      const res = await apiFetch<any>(url);
       setEligibility(res);
       if (searchParams.get('review') === 'true' && res.eligible && !res.hasReviewed) {
         setIsReviewModalOpen(true);
@@ -642,62 +647,140 @@ export default function HotelAvailabilityPage() {
                           )}
                         </div>
 
-                        {/* Rate Plans List for this Room Type */}
+                        {/* Rate Plans List for this Room Type (Adaptive Sizing & Scrollbar for 4+ Options) */}
                         <div className="pt-4 border-t border-charcoal-100 space-y-3">
-                          <p className="text-xs font-mono font-normal uppercase text-charcoal-500">
-                            Select Rate Option & Hold Inventory
-                          </p>
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-xs font-mono font-normal uppercase text-charcoal-500">
+                              Select Rate Option & Hold Inventory ({rt.ratePlans.length} {rt.ratePlans.length === 1 ? 'Package' : 'Packages'})
+                            </p>
+                            {rt.ratePlans.length > 4 && (
+                              <span className="text-[11px] font-mono text-neutral-500">
+                                Showing 4 visible • Scroll horizontally to view all {rt.ratePlans.length} &rarr;
+                              </span>
+                            )}
+                          </div>
 
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            {rt.ratePlans.map((rp: any) => {
-                              const canBook = rp.isAvailable && !isSoldOut;
+                          {(() => {
+                            const planCount = rt.ratePlans.length;
+                            const isScrollable = planCount > 4;
 
-                              return (
-                                <div
-                                  key={rp.ratePlanId}
-                                  className={`p-4 rounded-xl border flex flex-col justify-between transition-all ${
-                                    canBook
-                                      ? 'bg-white border-charcoal-200 hover:border-black shadow-sm'
-                                      : 'bg-charcoal-50 border-charcoal-200 text-charcoal-400'
-                                  }`}
-                                >
-                                  <div>
-                                    <div className="flex items-center justify-between gap-2">
-                                      <h4 className="font-normal text-sm text-charcoal-900">{rp.name}</h4>
-                                      {rp.isDefault && <Badge variant="neutral">RECOMMENDED</Badge>}
-                                    </div>
-                                    <p className="text-xs text-charcoal-500 mt-1">
-                                      {rp.cancellationPolicy === 'FREE_CANCELLATION'
-                                        ? `Free cancellation up to ${rp.cancellationDeadlineHours}h before arrival`
-                                        : rp.cancellationPolicy}
-                                    </p>
-                                  </div>
+                            // Responsive grid classes based on package count: more options = less size
+                            const containerClass = isScrollable
+                              ? 'flex gap-2.5 overflow-x-auto pb-3 pt-1 scrollbar-thin scrollbar-thumb-charcoal-300 scrollbar-track-charcoal-100'
+                              : planCount === 1
+                              ? 'grid grid-cols-1 gap-3'
+                              : planCount === 2
+                              ? 'grid grid-cols-1 md:grid-cols-2 gap-3'
+                              : planCount === 3
+                              ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5'
+                              : 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2';
 
-                                  <div className="pt-4 mt-3 border-t border-charcoal-100 flex items-end justify-between">
-                                    <div>
-                                      <span className="text-[10px] font-mono uppercase text-charcoal-500 block">
-                                        Total for {availability.totalNights} Night{availability.totalNights > 1 ? 's' : ''} (incl. tax)
-                                      </span>
-                                      <div className="flex items-baseline gap-1.5">
-                                        <span className="text-xl font-normal font-mono text-black">
-                                          ₹{Math.round((rp.totalCents || 0) / 100).toLocaleString('en-IN')}
-                                        </span>
+                            return (
+                              <div className={containerClass}>
+                                {rt.ratePlans.map((rp: any) => {
+                                  const canBook = rp.isAvailable && !isSoldOut;
+
+                                  // Card sizing adjusts based on package count
+                                  const cardClass = isScrollable
+                                    ? 'w-[calc(25%-8px)] min-w-[215px] shrink-0 p-3 rounded-xl border flex flex-col justify-between transition-all'
+                                    : planCount === 1
+                                    ? 'p-4 sm:p-5 rounded-xl border flex flex-col justify-between transition-all'
+                                    : planCount === 2
+                                    ? 'p-4 rounded-xl border flex flex-col justify-between transition-all'
+                                    : planCount === 3
+                                    ? 'p-3 sm:p-3.5 rounded-xl border flex flex-col justify-between transition-all'
+                                    : 'p-2.5 sm:p-3 rounded-xl border flex flex-col justify-between transition-all';
+
+                                  return (
+                                    <div
+                                      key={rp.ratePlanId}
+                                      className={`${cardClass} ${
+                                        canBook
+                                          ? 'bg-white border-charcoal-200 hover:border-black shadow-sm'
+                                          : 'bg-charcoal-50 border-charcoal-200 text-charcoal-400'
+                                      }`}
+                                    >
+                                      <div>
+                                        <div className="flex items-center justify-between gap-1.5 flex-wrap">
+                                          <h4
+                                            className={`font-normal text-charcoal-900 ${
+                                              planCount >= 4 || isScrollable
+                                                ? 'text-xs font-medium'
+                                                : planCount === 3
+                                                ? 'text-xs sm:text-sm font-medium'
+                                                : 'text-sm'
+                                            }`}
+                                          >
+                                            {rp.name}
+                                          </h4>
+                                          {rp.isDefault && (
+                                            <Badge variant="neutral" className="text-[10px] px-1.5 py-0 font-mono">
+                                              RECOMMENDED
+                                            </Badge>
+                                          )}
+                                        </div>
+
+                                        <p
+                                          className={`text-charcoal-500 mt-1 ${
+                                            planCount >= 4 || isScrollable ? 'text-[10px]' : 'text-xs'
+                                          }`}
+                                        >
+                                          {rp.cancellationPolicy === 'FREE_CANCELLATION'
+                                            ? `Free cancellation up to ${rp.cancellationDeadlineHours}h before arrival`
+                                            : rp.cancellationPolicy}
+                                        </p>
+
+                                        {/* Package description / inclusions */}
+                                        {rp.description && (
+                                          <p
+                                            className={`text-charcoal-600 font-light mt-1.5 leading-snug line-clamp-2 ${
+                                              planCount >= 4 || isScrollable ? 'text-[10px]' : 'text-xs'
+                                            }`}
+                                            title={rp.description}
+                                          >
+                                            {rp.description}
+                                          </p>
+                                        )}
+                                      </div>
+
+                                      <div
+                                        className={`mt-3 border-t border-charcoal-100 flex items-end justify-between ${
+                                          planCount >= 4 || isScrollable ? 'pt-2.5' : 'pt-3.5'
+                                        }`}
+                                      >
+                                        <div>
+                                          <span className="text-[10px] font-mono uppercase text-charcoal-500 block">
+                                            {availability.totalNights} Night{availability.totalNights > 1 ? 's' : ''} (incl. tax)
+                                          </span>
+                                          <div className="flex items-baseline gap-1">
+                                            <span
+                                              className={`font-normal font-mono text-black ${
+                                                planCount >= 4 || isScrollable ? 'text-base sm:text-lg' : 'text-xl'
+                                              }`}
+                                            >
+                                              ₹{Math.round((rp.totalCents || 0) / 100).toLocaleString('en-IN')}
+                                            </span>
+                                          </div>
+                                        </div>
+
+                                        <Button
+                                          size="sm"
+                                          disabled={!canBook}
+                                          onClick={() => handleOpenHoldModal(rt, rp)}
+                                          className={`gap-1 shrink-0 ${
+                                            planCount >= 4 || isScrollable ? 'text-[11px] px-2.5 py-1 h-7' : ''
+                                          }`}
+                                        >
+                                          <span>Hold Room</span>
+                                          <ArrowRight className="w-3 h-3" />
+                                        </Button>
                                       </div>
                                     </div>
-
-                                    <Button
-                                      size="sm"
-                                      disabled={!canBook}
-                                      onClick={() => handleOpenHoldModal(rt, rp)}
-                                      className="gap-1.5 shrink-0"
-                                    >
-                                      Hold Room <ArrowRight className="w-3.5 h-3.5" />
-                                    </Button>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
+                                  );
+                                })}
+                              </div>
+                            );
+                          })()}
                         </div>
                       </div>
                     </div>
@@ -1006,6 +1089,7 @@ export default function HotelAvailabilityPage() {
           hotelId={hotelId}
           hotelName={hotelData?.name}
           reservationId={eligibility?.reservationId}
+          reservationCode={eligibility?.reservationCode}
           roomTypeId={eligibility?.roomTypeId}
           onSuccess={() => {
             setIsReviewModalOpen(false);

@@ -15,6 +15,7 @@ interface ReviewModalProps {
   hotelId: string;
   hotelName?: string;
   reservationId?: string;
+  reservationCode?: string;
   roomTypeId?: string;
   onSuccess?: () => void;
 }
@@ -25,6 +26,7 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
   hotelId,
   hotelName,
   reservationId,
+  reservationCode,
   roomTypeId,
   onSuccess,
 }) => {
@@ -110,11 +112,18 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
           )}
 
           {/* Verified Stay Banner */}
-          <div className="p-2.5 rounded-lg bg-neutral-50 border border-neutral-200 flex items-center gap-2 text-xs text-neutral-700">
-            <ShieldCheck className="w-4 h-4 text-black shrink-0" />
-            <span className="font-normal text-[11px]">
-              Verified Stay Rating &bull; Visible publicly to prospective guests
-            </span>
+          <div className="p-2.5 rounded-lg bg-neutral-50 border border-neutral-200 flex items-center justify-between text-xs text-neutral-700">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-black shrink-0" />
+              <span className="font-normal text-[11px]">
+                Verified Stay Rating &bull; Visible publicly to prospective guests
+              </span>
+            </div>
+            {reservationCode && (
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-white border border-neutral-300 font-medium text-neutral-800">
+                Stay: {reservationCode}
+              </span>
+            )}
           </div>
 
           {/* Interactive Star Rating */}

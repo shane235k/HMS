@@ -204,9 +204,22 @@ export default function GuestReservationsPage() {
                 >
                   <CardHeader className="bg-canvas-neutral/70 border-b border-charcoal-200 p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-black text-white flex items-center justify-center font-normal font-serif shadow-sm">
-                        {res.hotel?.name?.[0] || 'H'}
-                      </div>
+                      {res.hotel?.images?.[0] ? (
+                        <div className="w-12 h-12 rounded-xl overflow-hidden border border-charcoal-200 bg-neutral-100 shrink-0 shadow-sm">
+                          <img
+                            src={res.hotel.images[0]}
+                            alt={res.hotel.name}
+                            className="w-full h-full object-cover"
+                            onError={(e: any) => {
+                              e.currentTarget.style.display = 'none';
+                            }}
+                          />
+                        </div>
+                      ) : (
+                        <div className="w-10 h-10 rounded-xl bg-black text-white flex items-center justify-center font-normal font-serif shadow-sm shrink-0">
+                          {res.hotel?.name?.[0] || 'H'}
+                        </div>
+                      )}
                       <div>
                         <div className="flex items-center gap-2">
                           <h3 className="font-normal text-sm text-charcoal-900">{res.hotel?.name}</h3>
@@ -559,6 +572,7 @@ export default function GuestReservationsPage() {
           hotelId={selectedReviewRes.hotel_id}
           hotelName={selectedReviewRes.hotel?.name}
           reservationId={selectedReviewRes.id}
+          reservationCode={selectedReviewRes.reservation_code}
           roomTypeId={selectedReviewRes.rooms?.[0]?.room_type_id}
           onSuccess={() => {
             loadReservations();

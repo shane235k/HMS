@@ -334,7 +334,8 @@ export class HotelsController {
     try {
       const hotelId = req.params.id;
       const userId = (req as any).user?.userId;
-      const result = await hotelsService.checkReviewEligibility(hotelId, userId);
+      const reservationId = req.query.reservationId as string | undefined;
+      const result = await hotelsService.checkReviewEligibility(hotelId, userId, reservationId);
 
       res.status(200).json({
         success: true,

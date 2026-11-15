@@ -397,6 +397,8 @@ model Reservation {
   guest_phone             String
   check_in_date           DateTime
   check_out_date          DateTime
+  checked_in_at           DateTime?
+  checked_out_at          DateTime?
   total_rooms_count       Int               @default(1)
   status                  ReservationStatus @default(TEMPORARY_HOLD)
   hold_expires_at         DateTime?

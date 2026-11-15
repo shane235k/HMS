@@ -752,17 +752,19 @@ describe('Milestone 4: Front Desk, Room Assignment, Housekeeping & Admin', () =>
   });
 
   afterAll(async () => {
-    // Teardown: Clean up operational test tasks, assignments, issues, payments, and reservations
-    await prisma.housekeepingTask.deleteMany();
-    await prisma.maintenanceIssue.deleteMany();
-    await prisma.roomAssignment.deleteMany();
-    await prisma.refundRecord.deleteMany();
-    await prisma.cancellationRecord.deleteMany();
-    await prisma.payment.deleteMany();
-    await prisma.reservationRoom.deleteMany();
-    await prisma.reservation.deleteMany();
-    await prisma.room.updateMany({
-      data: { operational_status: OperationalStatus.READY },
+    // Teardown: Clean up operational test tasks, assignments, issues, payments, and reservations created during this test suite only
+    const testReservations = await prisma.reservation.findMany({
+      where: { guest_email: { in: ['guest.sophia@example.com', 'guest.lucas@example.com', 'walkin.guest@example.com'] } },
+      select: { id: true },
     });
+    const resIds = testReservations.map((r) => r.id);
+    if (resIds.length > 0) {
+      await prisma.roomAssignment.deleteMany({ where: { reservation_id: { in: resIds } } });
+      await prisma.refundRecord.deleteMany({ where: { reservation_id: { in: resIds } } });
+      await prisma.cancellationRecord.deleteMany({ where: { reservation_id: { in: resIds } } });
+      await prisma.payment.deleteMany({ where: { reservation_id: { in: resIds } } });
+      await prisma.reservationRoom.deleteMany({ where: { reservation_id: { in: resIds } } });
+      await prisma.reservation.deleteMany({ where: { id: { in: resIds } } });
+    }
   });
 });

@@ -86,6 +86,14 @@ router.get(
   (req, res, next) => managementController.getOperationsReport(req, res, next)
 );
 
+// Financial Transactions & Journal (Positive payments & Negative cancellations)
+router.get(
+  '/transactions',
+  requirePropertyScope(),
+  requireRoles(MANAGEMENT_ONLY_ROLES),
+  (req, res, next) => managementController.getTransactions(req, res, next)
+);
+
 // ====================================================
 // MILESTONE 2: INVENTORY & RATE MANAGEMENT
 // ====================================================

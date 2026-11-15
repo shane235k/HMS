@@ -1,6 +1,14 @@
 // apps/api/src/modules/management/management.service.ts
 import { prisma } from '@hbms/database';
-import { CreateStaffInput, UpdateStaffStatusInput, Role, UserStatus, formatCurrencyMinor } from '@hbms/shared';
+import {
+  CreateStaffInput,
+  UpdateStaffStatusInput,
+  Role,
+  UserStatus,
+  formatCurrencyMinor,
+  ManagerTransactionsResponse,
+  ManagerTransactionRecord,
+} from '@hbms/shared';
 import { hashPassword } from '../../common/utils/password';
 import { ConflictError, NotFoundError, ForbiddenError } from '../../common/errors';
 import { logAuditEvent } from '../../common/utils/audit';
@@ -80,6 +88,12 @@ export class ManagementService {
         email: data.email ?? hotel.email,
         check_in_time: data.checkInTime ?? hotel.check_in_time,
         check_out_time: data.checkOutTime ?? hotel.check_out_time,
+        images:
+          data.images !== undefined
+            ? data.images
+            : data.coverImage
+            ? [data.coverImage]
+            : hotel.images,
         tax_rate_bps:
           data.taxRateBps !== undefined
             ? data.taxRateBps
@@ -250,28 +264,28 @@ export class ManagementService {
       }
     }
 
-    // 2. Arrivals, Departures, and In-House stays
+    // 2. Arrivals, Departures, and In-House stays (supporting historical and active dates)
     const [arrivalsCount, departuresCount, inHouseRes] = await Promise.all([
       prisma.reservation.count({
         where: {
           hotel_id: hotelId,
           check_in_date: { gte: targetDate, lt: nextDate },
-          status: { in: ['CONFIRMED', 'CHECKED_IN'] },
+          status: { in: ['CONFIRMED', 'CHECKED_IN', 'CHECKED_OUT'] as any },
         },
       }),
       prisma.reservation.count({
         where: {
           hotel_id: hotelId,
           check_out_date: { gte: targetDate, lt: nextDate },
-          status: { in: ['CHECKED_IN', 'CHECKED_OUT'] },
+          status: { in: ['CONFIRMED', 'CHECKED_IN', 'CHECKED_OUT'] as any },
         },
       }),
       prisma.reservation.findMany({
         where: {
           hotel_id: hotelId,
-          check_in_date: { lte: targetDate },
-          check_out_date: { gt: targetDate },
-          status: { in: ['CONFIRMED', 'CHECKED_IN'] },
+          check_in_date: { lt: nextDate },
+          check_out_date: { gte: nextDate },
+          status: { in: ['CONFIRMED', 'CHECKED_IN', 'CHECKED_OUT'] as any },
         },
         include: {
           rooms: true,
@@ -281,22 +295,37 @@ export class ManagementService {
 
     // 3. Occupancy & Revenue calculations
     const totalRooms = rooms.length;
-    const occupiedRooms = roomStatusCounts.OCCUPIED;
-    const occupancyRatePercent =
-      totalRooms > 0 ? Number(((occupiedRooms / totalRooms) * 100).toFixed(1)) : 0;
-
     let dailyRevenueCents = 0;
+    let inHouseOccupiedRooms = 0;
+
     for (const res of inHouseRes) {
       for (const rr of res.rooms) {
-        // Find snapshot rate for this date if present, or average nightly rate
-        const dateMatch = rr.nightly_breakdown?.find((nb: any) => nb.date === dateFormatted);
-        if (dateMatch) {
+        inHouseOccupiedRooms += rr.quantity;
+        // Parse nightly breakdown if present
+        let breakdown: any[] = [];
+        if (Array.isArray(rr.nightly_breakdown)) {
+          breakdown = rr.nightly_breakdown;
+        } else if (typeof rr.nightly_breakdown === 'string') {
+          try {
+            breakdown = JSON.parse(rr.nightly_breakdown);
+          } catch {}
+        }
+
+        const dateMatch = breakdown?.find((nb: any) => nb?.date === dateFormatted);
+        if (dateMatch && typeof dateMatch.rate_cents === 'number') {
           dailyRevenueCents += dateMatch.rate_cents * rr.quantity;
-        } else {
+        } else if (typeof rr.nightly_rate_cents === 'number' && rr.nightly_rate_cents > 0) {
           dailyRevenueCents += rr.nightly_rate_cents * rr.quantity;
+        } else if (res.total_cents > 0) {
+          dailyRevenueCents += Math.round(res.total_cents / (rr.quantity || 1));
         }
       }
     }
+
+    // Historical & live occupancy matching
+    const occupiedRooms = Math.max(roomStatusCounts.OCCUPIED, inHouseOccupiedRooms);
+    const occupancyRatePercent =
+      totalRooms > 0 ? Number(((occupiedRooms / totalRooms) * 100).toFixed(1)) : 0;
 
     // Today's payments captured for this hotel (cash basis / payments conveyer)
     const todayHotelPayments = await prisma.payment.findMany({
@@ -310,8 +339,9 @@ export class ManagementService {
     const paymentsCollectedTodayCents = todayHotelPayments.reduce((sum, p) => sum + p.amount_cents, 0);
     const effectiveDailyRevenueCents = paymentsCollectedTodayCents > 0 ? paymentsCollectedTodayCents : dailyRevenueCents;
 
-    const revPARCents = totalRooms > 0 ? Math.round(effectiveDailyRevenueCents / totalRooms) : 0;
-    const adrCents = occupiedRooms > 0 ? Math.round(effectiveDailyRevenueCents / occupiedRooms) : 0;
+    // Hospitality Metrics: RevPAR and ADR reflect stay night revenue
+    const revPARCents = totalRooms > 0 ? Math.round(dailyRevenueCents / totalRooms) : 0;
+    const adrCents = occupiedRooms > 0 ? Math.round(dailyRevenueCents / occupiedRooms) : 0;
 
     // 4. Housekeeping performance
     const [tasksToday, completedCleansToday] = await Promise.all([
@@ -537,18 +567,18 @@ export class ManagementService {
         inHouseStayRevenueCents: dailyRevenueCents,
         paymentsCollectedTodayCents,
         todayCashInflowCents: paymentsCollectedTodayCents,
-        todayCashInflowFormatted: formatCurrencyMinor(paymentsCollectedTodayCents, 'INR'),
+        todayCashInflowFormatted: formatCurrencyMinor(paymentsCollectedTodayCents, currency),
         todayStayRevenueCents: dailyRevenueCents,
-        todayStayRevenueFormatted: formatCurrencyMinor(dailyRevenueCents, 'INR'),
+        todayStayRevenueFormatted: formatCurrencyMinor(dailyRevenueCents, currency),
         revPARCents,
         adrCents,
         totalRevenueCents: effectiveDailyRevenueCents,
-        totalRevenueFormatted: formatCurrencyMinor(effectiveDailyRevenueCents, 'INR'),
+        totalRevenueFormatted: formatCurrencyMinor(effectiveDailyRevenueCents, currency),
         annualGrossRevenueCents,
-        annualGrossRevenueFormatted: formatCurrencyMinor(annualGrossRevenueCents, 'INR'),
+        annualGrossRevenueFormatted: formatCurrencyMinor(annualGrossRevenueCents, currency),
         revparCents: revPARCents,
-        revparFormatted: formatCurrencyMinor(revPARCents, 'INR'),
-        adrFormatted: formatCurrencyMinor(adrCents, 'INR'),
+        revparFormatted: formatCurrencyMinor(revPARCents, currency),
+        adrFormatted: formatCurrencyMinor(adrCents, currency),
         analytics,
       },
       analytics,
@@ -581,6 +611,224 @@ export class ManagementService {
       },
       recentAuditLogs,
       auditHistory: recentAuditLogs,
+    };
+  }
+
+  /**
+   * Retrieves paginated financial and booking transactions for a hotel property.
+   * Compiles positive payment inflows and negative cancellation refunds with green/red attributes.
+   */
+  async getHotelTransactions(
+    hotelId: string,
+    options: { page?: number; limit?: number; filter?: string; search?: string } = {}
+  ): Promise<ManagerTransactionsResponse> {
+    const page = Math.max(1, Number(options.page) || 1);
+    const limit = Math.max(1, Number(options.limit) || 25);
+    const filter = (options.filter || 'ALL').toUpperCase();
+    const search = options.search?.trim().toLowerCase();
+
+    const hotel = await prisma.hotel.findUnique({
+      where: { id: hotelId },
+      select: { currency: true, name: true },
+    });
+    const currency = hotel?.currency || 'INR';
+
+    // Retrieve all reservations for this hotel that represent confirmed bookings, payments or cancellations
+    const reservations = await prisma.reservation.findMany({
+      where: {
+        hotel_id: hotelId,
+        status: { in: ['CONFIRMED', 'CHECKED_IN', 'CHECKED_OUT', 'CANCELLED'] as any },
+      },
+      include: {
+        rooms: {
+          include: {
+            room_type: { select: { id: true, name: true, slug: true } },
+            rate_plan: { select: { id: true, name: true } },
+          },
+        },
+        assignments: {
+          include: {
+            room: { select: { room_number: true, floor: true } },
+          },
+        },
+        payments: {
+          orderBy: { created_at: 'desc' },
+        },
+        cancellation: {
+          include: {
+            refund: true,
+          },
+        },
+      },
+      orderBy: { created_at: 'desc' },
+    });
+
+    let grossRevenueCents = 0;
+    let totalRefundsCents = 0;
+    let completedBookingsCount = 0;
+    let cancellationsCount = 0;
+
+    const allJournalRows: ManagerTransactionRecord[] = [];
+
+    for (const res of reservations) {
+      const suiteName =
+        res.rooms.map((r) => r.room_type?.name || 'Suite').filter(Boolean).join(', ') || 'Standard Suite';
+      const roomNumbers = Array.from(
+        new Set(res.assignments.map((a) => a.room?.room_number).filter(Boolean))
+      ) as string[];
+      const nights = Math.max(
+        1,
+        Math.round((res.check_out_date.getTime() - res.check_in_date.getTime()) / (1000 * 60 * 60 * 24))
+      );
+      const nightlyRateCents =
+        res.rooms[0]?.nightly_rate_cents || Math.round(res.subtotal_cents / nights);
+      const isCancelled = res.status === 'CANCELLED';
+
+      if (isCancelled) {
+        cancellationsCount++;
+      } else {
+        completedBookingsCount++;
+      }
+
+      // Successful payments
+      const successfulPayments = res.payments.filter((p) => p.status === 'SUCCESS');
+      const paymentAmount =
+        successfulPayments.reduce((sum, p) => sum + p.amount_cents, 0) || (isCancelled ? 0 : res.total_cents);
+
+      if (paymentAmount > 0) {
+        grossRevenueCents += paymentAmount;
+      }
+
+      // If reservation was cancelled, compute refund
+      let refundAmountCents = 0;
+      if (isCancelled && res.cancellation) {
+        refundAmountCents =
+          res.cancellation.eligible_refund_cents ||
+          res.cancellation.refund?.amount_cents ||
+          res.total_cents;
+        totalRefundsCents += refundAmountCents;
+      }
+
+      // Create Payment Journal Row (for confirmed bookings or bookings that captured payment)
+      if (paymentAmount > 0 || !isCancelled) {
+        const paymentTxnRef =
+          successfulPayments[0]?.transaction_reference || `TXN-${res.reservation_code}`;
+        const paymentDate =
+          successfulPayments[0]?.created_at?.toISOString() || res.created_at.toISOString();
+
+        allJournalRows.push({
+          id: successfulPayments[0]?.id || `pay_${res.id}`,
+          type: 'PAYMENT',
+          bookingId: res.id,
+          bookingCode: res.reservation_code,
+          transactionReference: paymentTxnRef,
+          guestName: res.guest_name,
+          guestEmail: res.guest_email,
+          guestPhone: res.guest_phone,
+          suiteName,
+          roomNumbers,
+          nightlyRateCents,
+          nightlyRateFormatted: formatCurrencyMinor(nightlyRateCents, currency),
+          bookedAt: paymentDate,
+          checkInDate: res.check_in_date.toISOString(),
+          checkOutDate: res.check_out_date.toISOString(),
+          nightsCount: nights,
+          status: isCancelled ? 'CANCELLED' : res.status,
+          paymentStatus: successfulPayments[0]?.status || 'SUCCESS',
+          amountCents: paymentAmount,
+          amountFormatted: `+${formatCurrencyMinor(paymentAmount, currency)}`,
+          currency,
+          paymentMethod: successfulPayments[0]?.payment_method || 'MOCK_CARD',
+        });
+      }
+
+      // Create Cancellation / Refund Journal Row
+      if (isCancelled && res.cancellation) {
+        const refundTxnRef =
+          res.cancellation.refund?.refund_reference || `CANC-${res.reservation_code}`;
+        const cancelledDate =
+          res.cancellation.cancelled_at?.toISOString() || res.updated_at.toISOString();
+
+        allJournalRows.push({
+          id: res.cancellation.id || `canc_${res.id}`,
+          type: 'REFUND',
+          bookingId: res.id,
+          bookingCode: res.reservation_code,
+          transactionReference: refundTxnRef,
+          guestName: res.guest_name,
+          guestEmail: res.guest_email,
+          guestPhone: res.guest_phone,
+          suiteName,
+          roomNumbers,
+          nightlyRateCents,
+          nightlyRateFormatted: formatCurrencyMinor(nightlyRateCents, currency),
+          bookedAt: cancelledDate,
+          checkInDate: res.check_in_date.toISOString(),
+          checkOutDate: res.check_out_date.toISOString(),
+          nightsCount: nights,
+          status: 'CANCELLED',
+          paymentStatus: res.cancellation.refund?.status || 'REFUNDED',
+          amountCents: -refundAmountCents,
+          amountFormatted: `-${formatCurrencyMinor(refundAmountCents, currency)}`,
+          currency,
+          paymentMethod: successfulPayments[0]?.payment_method || 'MOCK_CARD',
+          cancellationReason: res.cancellation.cancellation_reason || 'Guest requested cancellation',
+          cancelledAt: cancelledDate,
+        });
+      }
+    }
+
+    // Sort all rows by bookedAt descending
+    allJournalRows.sort((a, b) => new Date(b.bookedAt).getTime() - new Date(a.bookedAt).getTime());
+
+    // Apply Filter
+    let filteredRows = allJournalRows;
+    if (filter === 'PAYMENTS') {
+      filteredRows = filteredRows.filter((r) => r.type === 'PAYMENT');
+    } else if (filter === 'CANCELLATIONS') {
+      filteredRows = filteredRows.filter((r) => r.type === 'REFUND');
+    }
+
+    // Apply Search
+    if (search) {
+      filteredRows = filteredRows.filter(
+        (r) =>
+          r.bookingCode.toLowerCase().includes(search) ||
+          r.transactionReference.toLowerCase().includes(search) ||
+          r.guestName.toLowerCase().includes(search) ||
+          r.guestEmail.toLowerCase().includes(search) ||
+          r.suiteName.toLowerCase().includes(search)
+      );
+    }
+
+    const netRevenueCents = grossRevenueCents - totalRefundsCents;
+    const totalTransactionsCount = allJournalRows.length;
+
+    const total = filteredRows.length;
+    const totalPages = Math.max(1, Math.ceil(total / limit));
+    const offset = (page - 1) * limit;
+    const paginatedRows = filteredRows.slice(offset, offset + limit);
+
+    return {
+      summary: {
+        grossRevenueCents,
+        grossRevenueFormatted: formatCurrencyMinor(grossRevenueCents, currency),
+        totalRefundsCents,
+        totalRefundsFormatted: formatCurrencyMinor(totalRefundsCents, currency),
+        netRevenueCents,
+        netRevenueFormatted: formatCurrencyMinor(netRevenueCents, currency),
+        totalTransactionsCount,
+        completedBookingsCount,
+        cancellationsCount,
+        currency,
+      },
+      transactions: paginatedRows,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages,
+      },
     };
   }
 }

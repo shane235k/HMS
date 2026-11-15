@@ -46,6 +46,8 @@ export const hotelApplicationSchema = z.object({
   checkInTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Check-in time must be in HH:MM format (e.g. 14:00)').optional().default('14:00'),
   checkOutTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Check-out time must be in HH:MM format (e.g. 11:00)').optional().default('11:00'),
   description: z.string().optional(),
+  coverImage: z.string().optional(),
+  images: z.array(z.string()).optional(),
 });
 
 export const reviewApplicationSchema = z.object({
@@ -132,7 +134,7 @@ export const createRoomBlockSchema = z.object({
 export const createRatePlanSchema = z.object({
   roomTypeId: z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid roomTypeId ObjectId'),
   name: z.string().min(2, 'Rate plan name is required'),
-  description: z.string().optional(),
+  description: z.string().min(5, 'Package description is required describing what it includes'),
   basePriceCents: z.number().int().min(100, 'Base price must be at least 100 minor units'),
   cancellationPolicy: z.nativeEnum(CancellationPolicy).default(CancellationPolicy.FREE_CANCELLATION),
   cancellationDeadlineHours: z.number().int().min(0).default(48),

@@ -61,6 +61,8 @@ export interface HotelApplicationSummary {
   longitude: number;
   category: HotelCategory;
   description?: string | null;
+  coverImage?: string | null;
+  images?: string[];
   status: ApplicationStatus;
   rejectionReason?: string | null;
   adminNotes?: string | null;
@@ -403,6 +405,61 @@ export interface DetailedRoomType {
   reviewsSummary?: {
     averageRating: number | null;
     totalReviews: number;
+  };
+}
+
+// ====================================================
+// MILESTONE 4: MANAGER TRANSACTIONS & FINANCIAL LEDGER
+// ====================================================
+
+export interface ManagerTransactionRecord {
+  id: string;
+  type: 'PAYMENT' | 'REFUND';
+  bookingId: string;
+  bookingCode: string;
+  transactionReference: string;
+  guestName: string;
+  guestEmail: string;
+  guestPhone: string;
+  suiteName: string;
+  roomNumbers: string[];
+  nightlyRateCents: number;
+  nightlyRateFormatted: string;
+  bookedAt: string;
+  checkInDate: string;
+  checkOutDate: string;
+  nightsCount: number;
+  status: string;
+  paymentStatus: string;
+  amountCents: number;
+  amountFormatted: string;
+  currency: string;
+  paymentMethod?: string;
+  cancellationReason?: string | null;
+  cancelledAt?: string | null;
+}
+
+export interface ManagerTransactionsSummary {
+  grossRevenueCents: number;
+  grossRevenueFormatted: string;
+  totalRefundsCents: number;
+  totalRefundsFormatted: string;
+  netRevenueCents: number;
+  netRevenueFormatted: string;
+  totalTransactionsCount: number;
+  completedBookingsCount: number;
+  cancellationsCount: number;
+  currency: string;
+}
+
+export interface ManagerTransactionsResponse {
+  summary: ManagerTransactionsSummary;
+  transactions: ManagerTransactionRecord[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
   };
 }
 

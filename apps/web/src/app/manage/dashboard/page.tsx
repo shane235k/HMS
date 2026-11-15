@@ -31,6 +31,7 @@ import {
   RefreshCw,
   ShieldAlert,
   ArrowLeft,
+  Receipt,
 } from 'lucide-react';
 
 export interface DailyOperationsReport {
@@ -289,6 +290,14 @@ function ManagerDashboardContent() {
                   </Link>
                 )}
                 {hotel && (
+                  <Link href="/manage/transactions">
+                    <Button variant="outline" size="sm" className="gap-1.5 text-xs font-normal">
+                      <Receipt className="w-3.5 h-3.5" />
+                      <span>Transactions</span>
+                    </Button>
+                  </Link>
+                )}
+                {hotel && (
                   <Link href="/manage/inventory">
                     <Button variant="primary" size="sm" className="gap-1.5 text-xs font-normal">
                       <BedDouble className="w-3.5 h-3.5" />
@@ -385,6 +394,19 @@ function ManagerDashboardContent() {
                       {application.status}
                     </Badge>
                   </div>
+
+                  {(application.coverImage || application.cover_image) && (
+                    <div className="relative h-48 w-full rounded-xl overflow-hidden border border-charcoal-200">
+                      <img
+                        src={application.coverImage || application.cover_image}
+                        alt={application.hotelName || 'Property Thumbnail'}
+                        className="w-full h-full object-cover"
+                      />
+                      <div className="absolute top-2.5 left-2.5 bg-black/60 backdrop-blur-xs text-white text-[10px] font-mono px-2 py-0.5 rounded-full uppercase tracking-wider">
+                        Submitted Thumbnail
+                      </div>
+                    </div>
+                  )}
 
                   <div className="grid grid-cols-2 gap-4 text-xs font-normal">
                     <div>

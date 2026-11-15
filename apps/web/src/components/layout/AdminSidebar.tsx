@@ -20,7 +20,8 @@ import {
   Sparkles,
   BedDouble,
   IndianRupee,
-  ClipboardList
+  ClipboardList,
+  Receipt
 } from 'lucide-react';
 import { clsx } from 'clsx';
 
@@ -71,6 +72,7 @@ export const AdminSidebar: React.FC = () => {
     { label: 'Housekeeping', href: '/housekeeping', icon: ClipboardList },
     { label: 'Room Inventory', href: '/manage/inventory', icon: BedDouble },
     { label: 'Rates & Calendar', href: '/manage/rates', icon: IndianRupee },
+    { label: 'Transactions', href: '/manage/transactions', icon: Receipt },
     { label: 'Staff Management', href: '/manage/staff', icon: Users },
   ];
 

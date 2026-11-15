@@ -7,6 +7,13 @@ import { hotelApplicationSchema, reviewApplicationSchema, Role } from '@hbms/sha
 
 const router = Router();
 
+// Upload image for property dossier
+router.post(
+  '/upload-image',
+  authenticate,
+  (req, res, next) => applicationsController.uploadImage(req, res, next)
+);
+
 // Manager submits application
 router.post(
   '/',

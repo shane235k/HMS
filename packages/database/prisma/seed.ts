@@ -54,7 +54,7 @@ async function main() {
   await prisma.hotelApplication.deleteMany();
   await prisma.refreshToken.deleteMany();
   await prisma.user.deleteMany();
-  console.log('✓ Database purged cleanly.\n');
+  console.log('✓ Database purged cleanly. All collections cleared.\n');
 
   // --------------------------------------------------------------------------
   // 2. PASSWORD HASHES
@@ -63,13 +63,12 @@ async function main() {
   const adminPasswordHash = await bcrypt.hash('Admin123!', saltRounds);
   const managerPasswordHash = await bcrypt.hash('Manager123!', saltRounds);
   const staffPasswordHash = await bcrypt.hash('Staff123!', saltRounds);
-  const guestPasswordHash = await bcrypt.hash('Guest123!', saltRounds);
-  const commonPasswordHash = await bcrypt.hash('123456789', saltRounds); // For test/demo accounts
+  const commonPasswordHash = await bcrypt.hash('123456789', saltRounds);
 
   // --------------------------------------------------------------------------
   // 3. CREATE USERS & ROLES
   // --------------------------------------------------------------------------
-  console.log('--- 2. Creating Multi-Role User Credentials ---');
+  console.log('--- 2. Creating Hotel Roles & Staff Credentials ---');
 
   // 3A. Platform Admin
   const admin = await prisma.user.create({
@@ -83,10 +82,9 @@ async function main() {
       status: UserStatus.ACTIVE,
     },
   });
-  console.log(`  ✓ Platform Admin: ${admin.email} (Admin123!)`);
+  console.log(`  ✓ Platform Admin: ${admin.email} (Password: Admin123!)`);
 
-  // 3B. Hotel Managers (Designated manager per hotel - strict 1:1)
-  // Paris Manager: m1@mail.com (Primary Demo Manager)
+  // 3B. Hotel Managers
   const managerParis = await prisma.user.create({
     data: {
       email: 'manager.paris@grandluxe.com',
@@ -98,7 +96,6 @@ async function main() {
       status: UserStatus.ACTIVE,
     },
   });
-  console.log(`  ✓ Paris Hotel Manager: ${managerParis.email} (Manager123!)`);
 
   const managerParisDemo = await prisma.user.create({
     data: {
@@ -111,7 +108,6 @@ async function main() {
       status: UserStatus.ACTIVE,
     },
   });
-  console.log(`  ✓ Paris Hotel Manager Demo: ${managerParisDemo.email} (123456789)`);
 
   const managerTokyo = await prisma.user.create({
     data: {
@@ -161,7 +157,7 @@ async function main() {
     },
   });
 
-  // 3C. Front Desk & Housekeeping Staff
+  // 3C. Front Desk Receptionists (Every Hotel)
   const receptionistParis = await prisma.user.create({
     data: {
       email: 'receptionist.paris@grandluxe.com',
@@ -174,6 +170,55 @@ async function main() {
     },
   });
 
+  const receptionistTokyo = await prisma.user.create({
+    data: {
+      email: 'receptionist.tokyo@sakura.com',
+      password_hash: staffPasswordHash,
+      role: Role.RECEPTIONIST,
+      first_name: 'Yuki',
+      last_name: 'Tanaka',
+      phone: '+81 3 5555 0124',
+      status: UserStatus.ACTIVE,
+    },
+  });
+
+  const receptionistBali = await prisma.user.create({
+    data: {
+      email: 'receptionist.bali@azurehaven.com',
+      password_hash: staffPasswordHash,
+      role: Role.RECEPTIONIST,
+      first_name: 'Ketut',
+      last_name: 'Aris',
+      phone: '+62 361 770001',
+      status: UserStatus.ACTIVE,
+    },
+  });
+
+  const receptionistNY = await prisma.user.create({
+    data: {
+      email: 'receptionist.ny@manhattan.com',
+      password_hash: staffPasswordHash,
+      role: Role.RECEPTIONIST,
+      first_name: 'Sarah',
+      last_name: 'Jenkins',
+      phone: '+1 212 555 7801',
+      status: UserStatus.ACTIVE,
+    },
+  });
+
+  const receptionistDubai = await prisma.user.create({
+    data: {
+      email: 'receptionist.dubai@palace.com',
+      password_hash: staffPasswordHash,
+      role: Role.RECEPTIONIST,
+      first_name: 'Fatima',
+      last_name: 'Al-Sayed',
+      phone: '+971 4 301 7778',
+      status: UserStatus.ACTIVE,
+    },
+  });
+
+  // 3D. Housekeeping Staff (Every Hotel)
   const housekeepingParis = await prisma.user.create({
     data: {
       email: 'housekeeping.paris@grandluxe.com',
@@ -186,75 +231,73 @@ async function main() {
     },
   });
 
-  // 3D. Demo Guests with Verified Stays
+  const housekeepingTokyo = await prisma.user.create({
+    data: {
+      email: 'housekeeping.tokyo@sakura.com',
+      password_hash: staffPasswordHash,
+      role: Role.HOUSEKEEPING,
+      first_name: 'Hana',
+      last_name: 'Sato',
+      phone: '+81 3 5555 0125',
+      status: UserStatus.ACTIVE,
+    },
+  });
+
+  const housekeepingBali = await prisma.user.create({
+    data: {
+      email: 'housekeeping.bali@azurehaven.com',
+      password_hash: staffPasswordHash,
+      role: Role.HOUSEKEEPING,
+      first_name: 'Made',
+      last_name: 'Dewi',
+      phone: '+62 361 770002',
+      status: UserStatus.ACTIVE,
+    },
+  });
+
+  const housekeepingNY = await prisma.user.create({
+    data: {
+      email: 'housekeeping.ny@manhattan.com',
+      password_hash: staffPasswordHash,
+      role: Role.HOUSEKEEPING,
+      first_name: 'David',
+      last_name: 'Miller',
+      phone: '+1 212 555 7802',
+      status: UserStatus.ACTIVE,
+    },
+  });
+
+  const housekeepingDubai = await prisma.user.create({
+    data: {
+      email: 'housekeeping.dubai@palace.com',
+      password_hash: staffPasswordHash,
+      role: Role.HOUSEKEEPING,
+      first_name: 'Rashid',
+      last_name: 'Khan',
+      phone: '+971 4 301 7779',
+      status: UserStatus.ACTIVE,
+    },
+  });
+
+  // 3E. THE SOLE TEST GUEST ACCOUNT: test1@mail.com named TEST ONE
   const testGuest1 = await prisma.user.create({
     data: {
       email: 'test1@mail.com',
       password_hash: commonPasswordHash,
       role: Role.GUEST,
-      first_name: 'Alex',
-      last_name: 'Rivers',
-      phone: '+1 555 0101',
+      first_name: 'TEST',
+      last_name: 'ONE',
+      phone: '+91 98200 00001',
       status: UserStatus.ACTIVE,
     },
   });
-
-  const testGuest2 = await prisma.user.create({
-    data: {
-      email: 'test2@mail.com',
-      password_hash: commonPasswordHash,
-      role: Role.GUEST,
-      first_name: 'Elena',
-      last_name: 'Rostova',
-      phone: '+1 555 0102',
-      status: UserStatus.ACTIVE,
-    },
-  });
-
-  const testGuest3 = await prisma.user.create({
-    data: {
-      email: 'test3@mail.com',
-      password_hash: commonPasswordHash,
-      role: Role.GUEST,
-      first_name: 'Marcus',
-      last_name: 'Vance',
-      phone: '+1 555 0103',
-      status: UserStatus.ACTIVE,
-    },
-  });
-
-  const testGuest4 = await prisma.user.create({
-    data: {
-      email: 'test4@mail.com',
-      password_hash: commonPasswordHash,
-      role: Role.GUEST,
-      first_name: 'Priya',
-      last_name: 'Nair',
-      phone: '+91 98200 0104',
-      status: UserStatus.ACTIVE,
-    },
-  });
-
-  const standardGuest = await prisma.user.create({
-    data: {
-      email: 'guest.sophia@example.com',
-      password_hash: guestPasswordHash,
-      role: Role.GUEST,
-      first_name: 'Sophia',
-      last_name: 'Martinez',
-      phone: '+1 415 555 2671',
-      status: UserStatus.ACTIVE,
-    },
-  });
-
-  console.log('✓ Created Platform Admin, 5 Managers, Receptionist, Housekeeper, and 5 Guests.\n');
+  console.log(`  ✓ Sole Guest: ${testGuest1.email} (Name: TEST ONE, Password: 123456789)\n`);
 
   // --------------------------------------------------------------------------
   // 4. APPROVED HOTELS & APPLICATIONS
   // --------------------------------------------------------------------------
-  console.log('--- 3. Creating Approved Hotels & Properties ---');
+  console.log('--- 3. Creating Approved Hotels & Applications ---');
 
-  // Helper for Application + Hotel
   async function createHotelWithApp(params: {
     managerId: string;
     name: string;
@@ -350,11 +393,11 @@ async function main() {
     state: 'Île-de-France',
     country: 'France',
     postalCode: '75001',
-    latitude: 48.8606,
-    longitude: 2.3376,
+    latitude: 48.8675,
+    longitude: 2.3294,
     category: HotelCategory.LUXURY,
     starRating: 5,
-    description: 'An iconic 19th-century palace hotel overlooking Place Vendôme, combining neoclassical French grandeur with bespoke modern luxury, Michelin-starred gastronomy, and private garden salons.',
+    description: 'An iconic palace hotel on prestigious Place Vendôme, featuring opulent Haussmann-era interiors, crystal chandeliers, a two-Michelin-starred restaurant, and bespoke butler service.',
     images: [
       '/images/rooms/paris-royal-suite-1.webp',
       '/images/rooms/paris-tuileries-1.webp',
@@ -362,7 +405,7 @@ async function main() {
     ],
   });
 
-  // Attach Paris staff & demo manager
+  // Attach Paris staff
   await prisma.staffProfile.create({
     data: {
       user_id: managerParisDemo.id,
@@ -414,6 +457,23 @@ async function main() {
     ],
   });
 
+  await prisma.staffProfile.create({
+    data: {
+      user_id: receptionistTokyo.id,
+      hotel_id: hotelTokyo.id,
+      role: Role.RECEPTIONIST,
+      assigned_by_id: managerTokyo.id,
+    },
+  });
+  await prisma.staffProfile.create({
+    data: {
+      user_id: housekeepingTokyo.id,
+      hotel_id: hotelTokyo.id,
+      role: Role.HOUSEKEEPING,
+      assigned_by_id: managerTokyo.id,
+    },
+  });
+
   // 3. Azure Haven Resort Bali
   const { hotel: hotelBali } = await createHotelWithApp({
     managerId: managerBali.id,
@@ -438,6 +498,23 @@ async function main() {
       '/images/rooms/bali-sunset-pool-1.webp',
       '/images/rooms/bali-garden-sanctuary-1.webp',
     ],
+  });
+
+  await prisma.staffProfile.create({
+    data: {
+      user_id: receptionistBali.id,
+      hotel_id: hotelBali.id,
+      role: Role.RECEPTIONIST,
+      assigned_by_id: managerBali.id,
+    },
+  });
+  await prisma.staffProfile.create({
+    data: {
+      user_id: housekeepingBali.id,
+      hotel_id: hotelBali.id,
+      role: Role.HOUSEKEEPING,
+      assigned_by_id: managerBali.id,
+    },
   });
 
   // 4. The Manhattan Executive Suites New York
@@ -466,6 +543,23 @@ async function main() {
     ],
   });
 
+  await prisma.staffProfile.create({
+    data: {
+      user_id: receptionistNY.id,
+      hotel_id: hotelNY.id,
+      role: Role.RECEPTIONIST,
+      assigned_by_id: managerNY.id,
+    },
+  });
+  await prisma.staffProfile.create({
+    data: {
+      user_id: housekeepingNY.id,
+      hotel_id: hotelNY.id,
+      role: Role.HOUSEKEEPING,
+      assigned_by_id: managerNY.id,
+    },
+  });
+
   // 5. Emirates Mirage Palace Dubai
   const { hotel: hotelDubai } = await createHotelWithApp({
     managerId: managerDubai.id,
@@ -492,6 +586,23 @@ async function main() {
     ],
   });
 
+  await prisma.staffProfile.create({
+    data: {
+      user_id: receptionistDubai.id,
+      hotel_id: hotelDubai.id,
+      role: Role.RECEPTIONIST,
+      assigned_by_id: managerDubai.id,
+    },
+  });
+  await prisma.staffProfile.create({
+    data: {
+      user_id: housekeepingDubai.id,
+      hotel_id: hotelDubai.id,
+      role: Role.HOUSEKEEPING,
+      assigned_by_id: managerDubai.id,
+    },
+  });
+
   console.log('✓ Created 5 Approved Hotels: Paris, Tokyo, Bali, New York, Dubai.\n');
 
   // --------------------------------------------------------------------------
@@ -503,6 +614,7 @@ async function main() {
     name: string;
     slug: string;
     description: string;
+    rateDescription?: string;
     maxGuests: number;
     maxAdults: number;
     maxChildren: number;
@@ -534,45 +646,36 @@ async function main() {
         },
       });
 
-      // Create Physical Rooms
+      // Default Standard Flexible Rate Plan
+      await prisma.ratePlan.create({
+        data: {
+          room_type_id: roomType.id,
+          name: 'Best Available Flexible Rate',
+          description:
+            spec.rateDescription ||
+            'Standard flexible rate with free cancellation up to 48 hours before check-in. Includes high-speed Wi-Fi and full access to wellness pavilions.',
+          cancellation_policy: CancellationPolicy.FREE_CANCELLATION,
+          cancellation_deadline_hours: 48,
+          base_price_cents: Math.round(spec.basePriceINR * 100),
+          is_default: true,
+          is_active: true,
+        },
+      });
+
+      // Physical Rooms
       for (const num of spec.roomNumbers) {
+        const floor = parseInt(num[0], 10) || 1;
         await prisma.room.create({
           data: {
             hotel_id: hotelId,
             room_type_id: roomType.id,
             room_number: num,
-            floor: Math.floor(parseInt(num, 10) / 100) || 1,
+            floor,
             operational_status: OperationalStatus.READY,
+            is_active: true,
           },
         });
       }
-
-      // Default Flexible Rate Plan
-      const basePriceCents = spec.basePriceINR * 100;
-      await prisma.ratePlan.create({
-        data: {
-          room_type_id: roomType.id,
-          name: 'Lowest Regular Rate — Free Cancellation',
-          description: 'Best flexible rate with complimentary cancellation up to 48 hours prior to arrival.',
-          base_price_cents: basePriceCents,
-          cancellation_policy: CancellationPolicy.FREE_CANCELLATION,
-          cancellation_deadline_hours: 48,
-          is_default: true,
-        },
-      });
-
-      // Breakfast & Spa Package
-      await prisma.ratePlan.create({
-        data: {
-          room_type_id: roomType.id,
-          name: 'Breakfast & Spa Package',
-          description: 'Includes artisanal daily breakfast buffet, signature welcome drinks, and spa access.',
-          base_price_cents: Math.round(basePriceCents * 1.18),
-          cancellation_policy: CancellationPolicy.FREE_CANCELLATION,
-          cancellation_deadline_hours: 24,
-          is_default: false,
-        },
-      });
 
       created.push(roomType);
     }
@@ -584,31 +687,31 @@ async function main() {
     {
       name: 'Royal Palais Suite',
       slug: 'royal-palais-suite',
-      description: 'Opulent master suite with grand king bed, hand-carved moldings, private marble soaking bath, separate salon, and panoramic balcony vistas of the Louvre.',
+      description: 'Opulent master suite with hand-carved moldings, a marble soaking tub, private salon, and panoramic balcony views of the Louvre.',
       maxGuests: 3,
       maxAdults: 2,
       maxChildren: 1,
       bedType: '1 King Bed',
       roomSizeSqm: 85.0,
-      amenities: ['Private Balcony', 'Marble Soaking Tub', 'Espresso Bar', 'High-Speed Wi-Fi', '24h Butler Service', 'Air Conditioning', 'Mini Refrigerator', 'Lounge Chairs'],
+      amenities: ['Louvre View Balcony', 'Marble Soaking Tub', 'Bespoke Butler Service', 'High-Speed Wi-Fi', 'Complimentary Champagne'],
       images: [
         '/images/rooms/paris-royal-suite-1.webp',
         '/images/rooms/paris-royal-suite-2.webp',
         '/images/rooms/paris-royal-suite-3.webp',
       ],
-      basePriceINR: 58000,
+      basePriceINR: 45000,
       roomNumbers: ['201', '202', '203'],
     },
     {
       name: 'Deluxe Tuileries Room',
       slug: 'deluxe-tuileries-room',
-      description: 'Sunlit Parisian haven boasting soaring ceilings, custom velvet bedding, walk-in rain shower, and tranquil garden vistas.',
+      description: 'Elegant sanctuary dressed in soft French silks, featuring views of the Tuileries Garden and an Italian marble rain shower.',
       maxGuests: 2,
       maxAdults: 2,
       maxChildren: 0,
       bedType: '1 Queen Bed',
       roomSizeSqm: 50.0,
-      amenities: ['Garden View', 'Rain Shower', 'Espresso Machine', 'High-Speed Wi-Fi', 'Air Conditioning', 'Mini Refrigerator'],
+      amenities: ['Tuileries Garden View', 'Italian Marble Shower', 'High-Speed Wi-Fi', 'Nespresso Coffee Machine', 'Air Conditioning'],
       images: [
         '/images/rooms/paris-tuileries-1.webp',
         '/images/rooms/paris-tuileries-2.webp',
@@ -618,79 +721,97 @@ async function main() {
       roomNumbers: ['101', '102', '103'],
     },
     {
-      name: 'Classic Haussmann Chamber',
-      slug: 'classic-haussmann-chamber',
-      description: 'Refined Parisian chamber preserving authentic 19th-century chevron oak parquetry, marble fireplace, and bespoke modern furnishings.',
+      name: 'Classic Haussmann Suite',
+      slug: 'classic-haussmann-suite',
+      description: 'Quintessential Parisian charm with high chevron parquet ceilings, period fireplace, and dual private balconies.',
       maxGuests: 2,
       maxAdults: 2,
       maxChildren: 0,
-      bedType: '1 Queen Bed',
-      roomSizeSqm: 38.0,
-      amenities: ['Heritage Fireplace', 'Rain Shower', 'High-Speed Wi-Fi', 'Air Conditioning', 'Mini Refrigerator'],
+      bedType: '1 King Bed',
+      roomSizeSqm: 65.0,
+      amenities: ['Dual Private Balconies', 'Period Fireplace', 'High-Speed Wi-Fi', 'Air Conditioning', 'Turndown Service'],
       images: [
         '/images/rooms/paris-haussmann-1.webp',
         '/images/rooms/paris-haussmann-2.webp',
         '/images/rooms/paris-haussmann-3.webp',
       ],
-      basePriceINR: 24000,
+      basePriceINR: 28000,
       roomNumbers: ['301', '302', '303'],
     },
   ]);
 
+  // For Paris Hotel: Exactly ONE room (Deluxe Tuileries Room) has a 2nd package option
+  const parisDeluxeRoomType = parisRooms.find((r) => r.slug === 'deluxe-tuileries-room');
+  if (parisDeluxeRoomType) {
+    await prisma.ratePlan.create({
+      data: {
+        room_type_id: parisDeluxeRoomType.id,
+        name: 'Gourmet Breakfast & Spa Package',
+        description:
+          'Includes daily artisanal French buffet breakfast in the glass conservatory, priority thermal spa club access, and late checkout until 2:00 PM.',
+        base_price_cents: 3650000, // ₹36,500
+        cancellation_policy: CancellationPolicy.FREE_CANCELLATION,
+        cancellation_deadline_hours: 48,
+        is_default: false,
+        is_active: true,
+      },
+    });
+  }
+
   // Tokyo Rooms
   const tokyoRooms = await seedHotelRooms(hotelTokyo.id, [
     {
-      name: 'Hinoki Executive Penthouse',
-      slug: 'hinoki-executive-penthouse',
-      description: 'Bespoke top-floor penthouse with aromatic Hinoki cedar soaking bath, floor-to-ceiling Ginza skyline views, and curated Japanese tea ceremony salon.',
+      name: 'Hinoki Sky Penthouse',
+      slug: 'hinoki-sky-penthouse',
+      description: 'Private rooftop residence wrapped in fragrant Hinoki cedar with an open-air rotenburo onsen overlooking the Tokyo Tower skyline.',
       maxGuests: 3,
       maxAdults: 2,
       maxChildren: 1,
       bedType: '1 King Bed',
-      roomSizeSqm: 90.0,
-      amenities: ['Hinoki Wood Tub', 'Skyline Panorama', 'Private Tea Room', 'High-Speed Wi-Fi', 'Air Conditioning'],
+      roomSizeSqm: 110.0,
+      amenities: ['Private Open-Air Onsen', 'Tokyo Skyline Panorama', 'Traditional Tea Set', 'High-Speed Wi-Fi', 'Butler Service'],
       images: [
         '/images/rooms/tokyo-hinoki-penthouse-1.webp',
         '/images/rooms/tokyo-hinoki-penthouse-2.webp',
         '/images/rooms/tokyo-hinoki-penthouse-3.webp',
       ],
-      basePriceINR: 48000,
+      basePriceINR: 52000,
       roomNumbers: ['801', '802', '803'],
     },
     {
-      name: 'Deluxe Tatami Suite',
-      slug: 'deluxe-tatami-suite',
-      description: 'Harmonious blend of traditional Igusa tatami matting, plush organic futon bedding, Shoji paper screens, and zen indoor rock garden.',
-      maxGuests: 3,
+      name: 'Traditional Tatami Suite',
+      slug: 'traditional-tatami-suite',
+      description: 'Authentic Ryokan luxury with woven rush-grass tatami flooring, Shoji paper screens, and artisanal matcha ceremonies.',
+      maxGuests: 4,
       maxAdults: 3,
-      maxChildren: 1,
-      bedType: '2 Japanese Futons',
-      roomSizeSqm: 55.0,
-      amenities: ['Zen Rock Garden', 'Deep Soaking Tub', 'Yukata Robes', 'High-Speed Wi-Fi', 'Tea Station'],
+      maxChildren: 2,
+      bedType: '2 Japanese Futons, 1 Queen Bed',
+      roomSizeSqm: 68.0,
+      amenities: ['Tatami Living Area', 'Hinoki Soaking Tub', 'Curated Tea Ceremony', 'High-Speed Wi-Fi', 'Yukata Robes'],
       images: [
         '/images/rooms/tokyo-tatami-suite-1.webp',
         '/images/rooms/tokyo-tatami-suite-2.webp',
         '/images/rooms/tokyo-tatami-suite-3.webp',
       ],
-      basePriceINR: 28000,
+      basePriceINR: 36000,
       roomNumbers: ['501', '502', '503'],
     },
     {
       name: 'Modern Ginza Studio',
       slug: 'modern-ginza-studio',
-      description: 'Ultra-modern urban studio engineered with acoustic dampening, smart ambient illumination, and bespoke designer ergonomic workstation.',
+      description: 'Sleek metropolitan studio equipped with acoustic soundproofing, rainfall spa shower, and smart home automation.',
       maxGuests: 2,
       maxAdults: 2,
       maxChildren: 0,
-      bedType: '1 King Bed',
-      roomSizeSqm: 40.0,
-      amenities: ['City View', 'Smart Lighting', 'Rain Shower', 'High-Speed Wi-Fi', 'Mini Refrigerator'],
+      bedType: '1 Queen Bed',
+      roomSizeSqm: 42.0,
+      amenities: ['Ginza City View', 'Rainfall Spa Shower', 'Smart Climate Control', 'High-Speed Wi-Fi', 'Soundproof Windows'],
       images: [
         '/images/rooms/tokyo-ginza-studio-1.webp',
         '/images/rooms/tokyo-ginza-studio-2.webp',
         '/images/rooms/tokyo-ginza-studio-3.webp',
       ],
-      basePriceINR: 19500,
+      basePriceINR: 24000,
       roomNumbers: ['301', '302', '303'],
     },
   ]);
@@ -700,49 +821,49 @@ async function main() {
     {
       name: 'Oceanfront Cliffside Villa',
       slug: 'oceanfront-cliffside-villa',
-      description: 'Spacious ocean-view suites thoughtfully designed with floor-to-ceiling windows, private terraces, infinity plunge pool, and panoramic Indian Ocean vistas.',
+      description: 'Dramatic standalone villa cantilevered over the Nusa Dua cliffs with private infinity plunge pool and sunset panorama.',
       maxGuests: 4,
       maxAdults: 2,
       maxChildren: 2,
-      bedType: '1 King Bed, 2 Daybeds',
-      roomSizeSqm: 120.0,
-      amenities: ['Private Ocean Terrace', 'Plunge Pool', 'Outdoor Stone Tub', 'High-Speed Wi-Fi', 'Air Conditioner', 'Mini Refrigerator'],
+      bedType: '1 King Bed, 1 Daybed',
+      roomSizeSqm: 140.0,
+      amenities: ['Private Infinity Pool', 'Cliffside Ocean View', 'Outdoor Stone Bathtub', 'High-Speed Wi-Fi', 'Floating Breakfast'],
       images: [
         '/images/rooms/bali-cliff-villa-1.webp',
         '/images/rooms/bali-cliff-villa-2.webp',
         '/images/rooms/bali-cliff-villa-3.webp',
       ],
-      basePriceINR: 42000,
-      roomNumbers: ['101', '102', '103', '104'],
+      basePriceINR: 62000,
+      roomNumbers: ['101', '102', '103'],
     },
     {
-      name: 'Sunset Plunge Pool Villa',
-      slug: 'sunset-plunge-pool-villa',
-      description: 'Perched on the southern cliffside of Nusa Dua, featuring a private infinity plunge pool, outdoor marble shower, and unobstructed sunset panoramas.',
+      name: 'Sunset Infinity Pool Suite',
+      slug: 'sunset-infinity-pool-suite',
+      description: 'Lush tropical hideaway with private plunge pool, open-air living pavilion, and sweeping Indian Ocean sunset vistas.',
       maxGuests: 2,
       maxAdults: 2,
       maxChildren: 0,
       bedType: '1 King Bed',
-      roomSizeSqm: 95.0,
-      amenities: ['Private Plunge Pool', 'Sunset Ocean View', 'Outdoor Stone Tub', 'High-Speed Wi-Fi', 'Air Conditioner'],
+      roomSizeSqm: 90.0,
+      amenities: ['Plunge Pool', 'Ocean Sunset View', 'Open-Air Living Pavilion', 'High-Speed Wi-Fi', 'Rain Shower'],
       images: [
         '/images/rooms/bali-sunset-pool-1.webp',
         '/images/rooms/bali-sunset-pool-2.webp',
         '/images/rooms/bali-sunset-pool-3.webp',
       ],
-      basePriceINR: 35000,
+      basePriceINR: 42000,
       roomNumbers: ['201', '202', '203'],
     },
     {
-      name: 'Tropical Garden Sanctuary',
-      slug: 'tropical-garden-sanctuary',
-      description: 'Enclosed within fragrant frangipani gardens, this tranquil Balinese pavilion offers an open-air bathroom with stone tub, sheltered daybed, and private courtyard.',
-      maxGuests: 3,
+      name: 'Lush Garden Sanctuary',
+      slug: 'lush-garden-sanctuary',
+      description: 'Peaceful garden suite immersed in fragrant frangipani blossoms with private sun terrace and hand-carved stone bath.',
+      maxGuests: 2,
       maxAdults: 2,
-      maxChildren: 1,
+      maxChildren: 0,
       bedType: '1 King Bed',
-      roomSizeSqm: 75.0,
-      amenities: ['Private Courtyard', 'Open-Air Stone Bath', 'Tropical Garden View', 'High-Speed Wi-Fi', 'Air Conditioner'],
+      roomSizeSqm: 65.0,
+      amenities: ['Frangipani Garden Terrace', 'Stone Soaking Bath', 'High-Speed Wi-Fi', 'Air Conditioning', 'Espresso Bar'],
       images: [
         '/images/rooms/bali-garden-sanctuary-1.webp',
         '/images/rooms/bali-garden-sanctuary-2.webp',
@@ -756,51 +877,51 @@ async function main() {
   // New York Rooms
   const nyRooms = await seedHotelRooms(hotelNY.id, [
     {
-      name: 'Empire Skyline Suite',
-      slug: 'empire-skyline-suite',
-      description: 'High-floor executive corner suite featuring wraparound skyline views of Midtown Manhattan, king master bedroom, marble bath, and private conference salon.',
-      maxGuests: 3,
-      maxAdults: 2,
-      maxChildren: 1,
-      bedType: '1 King Bed',
-      roomSizeSqm: 80.0,
-      amenities: ['Manhattan Skyline View', 'Executive Desk', 'Marble Bath', 'High-Speed Wi-Fi', 'Air Conditioning'],
+      name: 'Central Park Presidential Penthouse',
+      slug: 'central-park-presidential-penthouse',
+      description: 'Spectacular multi-room penthouse with wrap-around terrace overlooking Central Park and the Manhattan skyline.',
+      maxGuests: 4,
+      maxAdults: 3,
+      maxChildren: 2,
+      bedType: '1 King Bed, 1 Queen Bed',
+      roomSizeSqm: 180.0,
+      amenities: ['Central Park Terrace', 'Private Chef Kitchen', 'Gas Fireplace', 'High-Speed Wi-Fi', 'Private Elevator'],
       images: [
         '/images/rooms/ny-empire-suite-1.webp',
         '/images/rooms/ny-empire-suite-2.webp',
         '/images/rooms/ny-empire-suite-3.webp',
       ],
-      basePriceINR: 45000,
-      roomNumbers: ['3401', '3402', '3403'],
+      basePriceINR: 78000,
+      roomNumbers: ['4001', '4002', '4003'],
     },
     {
-      name: 'Premier Times Square Studio',
-      slug: 'premier-times-square-studio',
-      description: 'Acoustically isolated sanctuary with floor-to-ceiling city views, plush king bedding, ergonomic workstation, and glass rain shower.',
+      name: 'Fifth Avenue Executive Suite',
+      slug: 'fifth-avenue-executive-suite',
+      description: 'Corner executive suite with floor-to-ceiling glass, marble bath with skyline views, and custom ergonomic executive desk.',
       maxGuests: 2,
       maxAdults: 2,
       maxChildren: 0,
       bedType: '1 King Bed',
-      roomSizeSqm: 45.0,
-      amenities: ['Soundproof Windows', 'Rain Shower', 'High-Speed Wi-Fi', 'Air Conditioning', 'Coffee Bar'],
+      roomSizeSqm: 65.0,
+      amenities: ['Fifth Avenue Panorama', 'Executive Ergonomic Desk', 'Marble Soaking Tub', 'High-Speed Wi-Fi'],
       images: [
         '/images/rooms/ny-premier-studio-1.webp',
         '/images/rooms/ny-premier-studio-2.webp',
         '/images/rooms/ny-premier-studio-3.webp',
       ],
-      basePriceINR: 26000,
+      basePriceINR: 34000,
       roomNumbers: ['2201', '2202', '2203'],
     },
     {
-      name: 'Hudson Corner Loft',
-      slug: 'hudson-corner-loft',
-      description: 'Loft-inspired layout with exposed architectural accents, designer kitchenette, plush queen bed, and skyline sunset views towards the Hudson River.',
+      name: 'Hudson River Skyline Loft',
+      slug: 'hudson-river-skyline-loft',
+      description: 'Chic open-concept industrial loft with exposed architectural columns and sweeping views toward the Hudson River.',
       maxGuests: 2,
       maxAdults: 2,
       maxChildren: 0,
       bedType: '1 Queen Bed',
       roomSizeSqm: 40.0,
-      amenities: ['Hudson River View', 'Kitchenette', 'High-Speed Wi-Speed', 'Air Conditioning'],
+      amenities: ['Hudson River View', 'Kitchenette', 'High-Speed Wi-Fi', 'Air Conditioning'],
       images: [
         '/images/rooms/ny-hudson-loft-1.webp',
         '/images/rooms/ny-hudson-loft-2.webp',
@@ -872,187 +993,19 @@ async function main() {
   console.log('✓ Seeded 5 Approved Hotels, 15 Room Types with Collages, and 49 Physical Rooms.\n');
 
   // --------------------------------------------------------------------------
-  // 6. COMPLETED STAYS, PAYMENTS & VERIFIED REVIEWS
+  // 6. CAREFULLY SEED THE ONE UNRATED COMPLETED STAY FOR test1@mail.com
   // --------------------------------------------------------------------------
-  console.log('--- 5. Seeding Completed Stays & Verified Reviews ---');
+  console.log('--- 5. Seeding Single Unrated Stay for test1@mail.com (Paris Hotel) ---');
 
-  // Booking on Monday Nov 09 (Cash Inflow), Check-in on Tuesday Nov 10 (Stay Revenue)
+  // Booking placed on Monday Nov 09 (Cash Inflow)
+  // Check-in on Tuesday Nov 10 (Stay Revenue)
+  // Check-out on Wednesday Nov 11 (Departure & Turnover Cleaning)
   const bookedDate = new Date('2026-11-09T14:30:00.000Z');
   const checkInDate = new Date('2026-11-10T14:00:00.000Z');
   const checkOutDate = new Date('2026-11-11T11:00:00.000Z');
+  const checkedInAt = new Date('2026-11-10T14:30:00.000Z');
+  const checkedOutAt = new Date('2026-11-11T10:45:00.000Z');
 
-  interface CompletedStaySpec {
-    code: string;
-    hotelId: string;
-    guestId: string;
-    guestName: string;
-    guestEmail: string;
-    roomType: any;
-    roomNumber: string;
-    rating: number;
-    reviewTitle: string;
-    reviewComment: string;
-  }
-
-  const completedStays: CompletedStaySpec[] = [
-    {
-      code: 'RES-REV-PARIS-101',
-      hotelId: hotelParis.id,
-      guestId: standardGuest.id,
-      guestName: 'Sophia Martinez',
-      guestEmail: standardGuest.email,
-      roomType: parisRooms[0], // Royal Palais Suite
-      roomNumber: '201',
-      rating: 5,
-      reviewTitle: 'Opulence and Unrivaled Parisian Splendor',
-      reviewComment: 'The Royal Palais Suite was breathtaking. Hand-carved moldings, a marble soaking bath with private salon, and panoramic balcony vistas of the Louvre made our stay completely unforgettable. Staff hospitality was world-class.',
-    },
-    {
-      code: 'RES-REV-TOKYO-101',
-      hotelId: hotelTokyo.id,
-      guestId: testGuest1.id,
-      guestName: 'Alex Rivers',
-      guestEmail: testGuest1.email,
-      roomType: tokyoRooms[2], // Modern Ginza Studio
-      roomNumber: '301',
-      rating: 5,
-      reviewTitle: 'Masterpiece in Minimalist Luxury',
-      reviewComment: 'Acoustic dampening provided complete silence right in the vibrant core of Ginza. The Hinoki woodwork aromas and morning tea service were unforgettable.',
-    },
-    {
-      code: 'RES-REV-BALI-101',
-      hotelId: hotelBali.id,
-      guestId: testGuest3.id,
-      guestName: 'Marcus Vance',
-      guestEmail: testGuest3.email,
-      roomType: baliRooms[0], // Oceanfront Cliffside Villa
-      roomNumber: '101',
-      rating: 5,
-      reviewTitle: 'Breathtaking Cliffside Ocean Views',
-      reviewComment: 'Private plunge pool blending seamlessly into the Indian Ocean horizon. Unparalleled tranquility and authentic Balinese hospitality.',
-    },
-    {
-      code: 'RES-REV-DUBAI-101',
-      hotelId: hotelDubai.id,
-      guestId: testGuest4.id,
-      guestName: 'Priya Nair',
-      guestEmail: testGuest4.email,
-      roomType: dubaiRooms[0], // Royal Palm Beach Villa
-      roomNumber: '101',
-      rating: 5,
-      reviewTitle: 'Unrivaled Palm Jumeirah Luxury',
-      reviewComment: 'Private white-sand beach access, temperature-controlled infinity pool, and personal butler service on Palm Jumeirah made this an extraordinary stay.',
-    },
-  ];
-
-  for (const s of completedStays) {
-    const ratePlan = await prisma.ratePlan.findFirst({
-      where: { room_type_id: s.roomType.id, is_default: true },
-    });
-    const physicalRoom = await prisma.room.findFirst({
-      where: { hotel_id: s.hotelId, room_number: s.roomNumber },
-    });
-
-    const nightlyRateCents = ratePlan ? ratePlan.base_price_cents : 4000000;
-    const subtotalCents = nightlyRateCents;
-    const taxCents = Math.round(subtotalCents * 0.12);
-    const totalCents = subtotalCents + taxCents;
-
-    // A. Reservation
-    const res = await prisma.reservation.create({
-      data: {
-        reservation_code: s.code,
-        hotel_id: s.hotelId,
-        guest_user_id: s.guestId,
-        guest_name: s.guestName,
-        guest_email: s.guestEmail,
-        guest_phone: '+91 98200 99999',
-        check_in_date: checkInDate,
-        check_out_date: checkOutDate,
-        total_rooms_count: 1,
-        status: ReservationStatus.CHECKED_OUT,
-        subtotal_cents: subtotalCents,
-        tax_cents: taxCents,
-        fees_cents: 0,
-        total_cents: totalCents,
-        currency: 'INR',
-        is_walk_in: false,
-        created_at: bookedDate,
-      },
-    });
-
-    // B. ReservationRoom line
-    const resRoom = await prisma.reservationRoom.create({
-      data: {
-        reservation_id: res.id,
-        room_type_id: s.roomType.id,
-        rate_plan_id: ratePlan!.id,
-        quantity: 1,
-        nightly_rate_cents: nightlyRateCents,
-        total_price_cents: totalCents,
-        nightly_breakdown: [
-          {
-            date: '2026-11-10',
-            rate_cents: nightlyRateCents,
-            is_override: false,
-          },
-        ],
-      },
-    });
-
-    // C. Room Assignment
-    if (physicalRoom) {
-      await prisma.roomAssignment.create({
-        data: {
-          reservation_id: res.id,
-          reservation_room_id: resRoom.id,
-          slot_index: 0,
-          room_id: physicalRoom.id,
-          assigned_at: checkInDate,
-          status: AssignmentStatus.RELEASED,
-          released_at: checkOutDate,
-          release_reason: 'Normal Guest Checkout Completed',
-        },
-      });
-    }
-
-    // D. Payment on Monday
-    await prisma.payment.create({
-      data: {
-        reservation_id: res.id,
-        idempotency_key: `IDEMP-${s.code}`,
-        transaction_reference: `TXN-${s.code}`,
-        payment_provider: 'MOCK_PROVIDER',
-        payment_method: 'MOCK_CARD',
-        amount_cents: totalCents,
-        currency: 'INR',
-        status: PaymentStatus.SUCCESS,
-        created_at: bookedDate,
-      },
-    });
-
-    // E. Verified Review bound 1:1 to Reservation
-    await prisma.review.create({
-      data: {
-        hotel_id: s.hotelId,
-        reservation_id: res.id,
-        room_type_id: s.roomType.id,
-        user_id: s.guestId,
-        rating: s.rating,
-        title: s.reviewTitle,
-        comment: s.reviewComment,
-        stay_date: 'November 2026',
-        is_verified: true,
-        created_at: new Date('2026-11-11T12:00:00.000Z'),
-      },
-    });
-
-    console.log(`  ✓ Seeded Completed Stay & Review: ${s.code} -> ${s.roomType.name} (Guest: ${s.guestEmail})`);
-  }
-
-  // --------------------------------------------------------------------------
-  // 5B. UNRATED PREVIOUS STAY FOR test2@mail.com (To demonstrate Rating Modal)
-  // --------------------------------------------------------------------------
   const unratedParisRoomType = parisRooms[1]; // Deluxe Tuileries Room
   const unratedParisRatePlan = await prisma.ratePlan.findFirst({
     where: { room_type_id: unratedParisRoomType.id, is_default: true },
@@ -1066,16 +1019,19 @@ async function main() {
   const unratedTaxCents = Math.round(unratedSubtotalCents * 0.12);
   const unratedTotalCents = unratedSubtotalCents + unratedTaxCents;
 
-  const unratedParisRes = await prisma.reservation.create({
+  // A. Reservation: Status CHECKED_OUT with exact check-in and check-out timestamps
+  const res = await prisma.reservation.create({
     data: {
-      reservation_code: 'RES-PARIS-UNRATED-101',
+      reservation_code: 'RES-PARIS-TEST1-101',
       hotel_id: hotelParis.id,
-      guest_user_id: testGuest2.id,
-      guest_name: 'Elena Rostova',
-      guest_email: testGuest2.email,
-      guest_phone: '+1 555 0102',
+      guest_user_id: testGuest1.id,
+      guest_name: 'TEST ONE',
+      guest_email: testGuest1.email,
+      guest_phone: '+91 98200 00001',
       check_in_date: checkInDate,
       check_out_date: checkOutDate,
+      checked_in_at: checkedInAt,
+      checked_out_at: checkedOutAt,
       total_rooms_count: 1,
       status: ReservationStatus.CHECKED_OUT,
       subtotal_cents: unratedSubtotalCents,
@@ -1088,9 +1044,10 @@ async function main() {
     },
   });
 
-  const unratedResRoom = await prisma.reservationRoom.create({
+  // B. ReservationRoom line
+  const resRoom = await prisma.reservationRoom.create({
     data: {
-      reservation_id: unratedParisRes.id,
+      reservation_id: res.id,
       room_type_id: unratedParisRoomType.id,
       rate_plan_id: unratedParisRatePlan!.id,
       quantity: 1,
@@ -1106,26 +1063,29 @@ async function main() {
     },
   });
 
+  // C. Room Assignment for Room 101 with timestamps
   if (unratedParisPhysicalRoom) {
     await prisma.roomAssignment.create({
       data: {
-        reservation_id: unratedParisRes.id,
-        reservation_room_id: unratedResRoom.id,
+        reservation_id: res.id,
+        reservation_room_id: resRoom.id,
         slot_index: 0,
         room_id: unratedParisPhysicalRoom.id,
-        assigned_at: checkInDate,
+        assigned_by_id: receptionistParis.id,
+        assigned_at: checkedInAt,
         status: AssignmentStatus.RELEASED,
-        released_at: checkOutDate,
+        released_at: checkedOutAt,
         release_reason: 'Normal Guest Checkout Completed',
       },
     });
   }
 
+  // D. Payment on Monday Nov 09 (Cash Inflow for Manager & Admin Dashboards)
   await prisma.payment.create({
     data: {
-      reservation_id: unratedParisRes.id,
-      idempotency_key: 'IDEMP-RES-PARIS-UNRATED-101',
-      transaction_reference: 'TXN-RES-PARIS-UNRATED-101',
+      reservation_id: res.id,
+      idempotency_key: 'IDEMP-RES-PARIS-TEST1-101',
+      transaction_reference: 'TXN-RES-PARIS-TEST1-101',
       payment_provider: 'MOCK_PROVIDER',
       payment_method: 'MOCK_CARD',
       amount_cents: unratedTotalCents,
@@ -1135,28 +1095,118 @@ async function main() {
     },
   });
 
-  // Seed Checkout Complete notification for testGuest2 so "Rate Your Stay" is visible in notifications
+  // E. Housekeeping Record showing the room was cleaned and set to READY
+  // Turnover clean created upon checkout, started, completed and inspected
+  const cleanCreated = new Date('2026-11-11T10:45:00.000Z');
+  const cleanStarted = new Date('2026-11-11T11:00:00.000Z');
+  const cleanCompleted = new Date('2026-11-11T11:45:00.000Z');
+
+  if (unratedParisPhysicalRoom) {
+    await prisma.housekeepingTask.create({
+      data: {
+        hotel_id: hotelParis.id,
+        room_id: unratedParisPhysicalRoom.id,
+        assigned_to_id: housekeepingParis.id,
+        inspected_by_id: receptionistParis.id,
+        task_type: TaskType.TURNOVER_CLEAN,
+        status: TaskStatus.COMPLETED,
+        notes: 'Automatic turnover clean on checkout for reservation RES-PARIS-TEST1-101',
+        created_at: cleanCreated,
+        started_at: cleanStarted,
+        completed_at: cleanCompleted,
+      },
+    });
+
+    // Confirm room operational status is set to READY after cleaning
+    await prisma.room.update({
+      where: { id: unratedParisPhysicalRoom.id },
+      data: { operational_status: OperationalStatus.READY },
+    });
+  }
+
+  // F. Notification for test1@mail.com to Rate Their Stay
   await prisma.notification.create({
     data: {
-      user_id: testGuest2.id,
+      user_id: testGuest1.id,
       title: 'Checkout Complete — Le Grand Luxe Paris',
       message: 'Thank you for staying at Le Grand Luxe Paris. How was your visit in the Deluxe Tuileries Room? Rate your stay to share your experience.',
       type: 'CHECKOUT_COMPLETE',
       metadata: {
         hotelId: hotelParis.id,
         hotelName: hotelParis.name,
-        reservationId: unratedParisRes.id,
+        reservationId: res.id,
       },
       is_read: false,
+      created_at: checkedOutAt,
     },
   });
 
-  console.log(`  ✓ Seeded UNRATED Completed Stay & Notification for ${testGuest2.email} (Paris Hotel)`);
+  // G. Audit Trail Logs for Reservation Lifecycle & Room Cleaning
+  await prisma.auditLog.createMany({
+    data: [
+      {
+        hotel_id: hotelParis.id,
+        actor_id: testGuest1.id,
+        actor_role: 'GUEST',
+        action: 'BOOKING_CONFIRMED',
+        entity_type: 'Reservation',
+        entity_id: res.id,
+        new_state: `Reservation ${res.reservation_code} confirmed for Deluxe Tuileries Room`,
+        created_at: bookedDate,
+      },
+      {
+        hotel_id: hotelParis.id,
+        actor_id: receptionistParis.id,
+        actor_role: 'STAFF',
+        action: 'ROOM_ASSIGNED',
+        entity_type: 'RoomAssignment',
+        entity_id: unratedParisPhysicalRoom?.id || res.id,
+        new_state: `Room 101 assigned to reservation ${res.reservation_code} slot 0`,
+        created_at: checkedInAt,
+      },
+      {
+        hotel_id: hotelParis.id,
+        actor_id: receptionistParis.id,
+        actor_role: 'STAFF',
+        action: 'CHECK_IN',
+        entity_type: 'Reservation',
+        entity_id: res.id,
+        new_state: `Checked in ${res.reservation_code}. Room 101 set to OCCUPIED`,
+        created_at: checkedInAt,
+      },
+      {
+        hotel_id: hotelParis.id,
+        actor_id: receptionistParis.id,
+        actor_role: 'STAFF',
+        action: 'CHECK_OUT',
+        entity_type: 'Reservation',
+        entity_id: res.id,
+        new_state: `Checked out ${res.reservation_code}. Room 101 set to DIRTY, turnover clean created`,
+        created_at: checkedOutAt,
+      },
+      {
+        hotel_id: hotelParis.id,
+        actor_id: housekeepingParis.id,
+        actor_role: 'STAFF',
+        action: 'ROOM_CLEANED',
+        entity_type: 'Room',
+        entity_id: unratedParisPhysicalRoom?.id || res.id,
+        new_state: 'Turnover clean approved by Elin Lund. Room 101 returned to READY status.',
+        created_at: cleanCompleted,
+      },
+    ],
+  });
+
+  console.log(`  ✓ Seeded Completed Stay: ${res.reservation_code} for ${testGuest1.email} (TEST ONE)`);
+  console.log(`  ✓ Timestamps: Check-in: ${checkedInAt.toISOString()}, Check-out: ${checkedOutAt.toISOString()}`);
+  console.log(`  ✓ Housekeeping: Clean created ${cleanCreated.toISOString()}, completed ${cleanCompleted.toISOString()}, Room 101 -> READY`);
+  console.log(`  ✓ Financials: Payment of ₹${unratedTotalCents / 100} on Nov 09, stay revenue on Nov 10`);
+  console.log(`  ✓ Unrated status: 0 reviews in DB (User test1@mail.com can rate their stay)\n`);
 
   // --------------------------------------------------------------------------
   // 7. INITIALIZE MONGODB ATLAS CUSTOM & 2DSPHERE INDEXES
   // --------------------------------------------------------------------------
-  console.log('\n--- 6. Reconciling MongoDB Atlas Custom & 2dsphere Indexes ---');
+  console.log('--- 6. Reconciling MongoDB Atlas Custom & 2dsphere Indexes ---');
   await initializeMongoIndexes();
 
   console.log('========================================================================');

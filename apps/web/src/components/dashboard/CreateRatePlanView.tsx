@@ -149,6 +149,11 @@ export const CreateRatePlanView: React.FC<CreateRatePlanViewProps> = ({
       return;
     }
 
+    if (!description.trim()) {
+      setError('Please provide a package description detailing what this rate plan includes.');
+      return;
+    }
+
     const parsedPrice = parseFloat(priceINR);
     if (isNaN(parsedPrice) || parsedPrice <= 0) {
       setError('Please provide a valid nightly rate in ₹.');
@@ -341,13 +346,14 @@ export const CreateRatePlanView: React.FC<CreateRatePlanViewProps> = ({
 
                 <div>
                   <label className="block text-xs font-normal uppercase tracking-wider text-neutral-600 mb-1.5 font-mono">
-                    Package Description & Inclusions
+                    Package Inclusions & Description *
                   </label>
                   <textarea
                     rows={3}
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
                     placeholder="Specify package perks, dining vouchers, airport transfers, or special booking rules..."
+                    required
                     className="w-full px-3.5 py-2.5 text-xs rounded-xl bg-white border border-charcoal-200 text-neutral-900 focus:outline-none focus:border-black font-normal leading-relaxed"
                   />
                 </div>

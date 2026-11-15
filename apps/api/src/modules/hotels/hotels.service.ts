@@ -942,8 +942,9 @@ export class HotelsService {
 
   /**
    * Checks if a user has completed a verified stay at the hotel and has not yet submitted a review for it.
+   * If reservationId is provided, checks eligibility specifically for that individual stay.
    */
-  async checkReviewEligibility(hotelId: string, userId: string) {
+  async checkReviewEligibility(hotelId: string, userId: string, reservationId?: string) {
     const hotel = await prisma.hotel.findUnique({ where: { id: hotelId }, select: { id: true, name: true } });
     if (!hotel) {
       throw new NotFoundError('Hotel not found');
@@ -954,7 +955,67 @@ export class HotelsService {
       throw new NotFoundError('User not found');
     }
 
-    // Find all completed reservations for this user at this hotel
+    // 1. If checking a specific reservation
+    if (reservationId) {
+      const targetRes = await prisma.reservation.findFirst({
+        where: {
+          id: reservationId,
+          hotel_id: hotelId,
+          OR: [
+            { guest_user_id: userId },
+            { guest_email: user.email },
+          ],
+        },
+        include: {
+          rooms: { select: { room_type_id: true }, take: 1 },
+        },
+      });
+
+      if (!targetRes) {
+        return {
+          eligible: false,
+          hasReviewed: false,
+          reason: 'Reservation not found for this property.',
+        };
+      }
+
+      if (targetRes.status !== ReservationStatus.CHECKED_OUT) {
+        return {
+          eligible: false,
+          hasReviewed: false,
+          reason: 'You can only rate and review your stay after check-out.',
+        };
+      }
+
+      const existingReview = await prisma.review.findFirst({
+        where: { reservation_id: targetRes.id },
+      });
+
+      if (existingReview) {
+        return {
+          eligible: false,
+          hasReviewed: true,
+          hotelId: hotel.id,
+          hotelName: hotel.name,
+          reservationId: targetRes.id,
+          reservationCode: targetRes.reservation_code,
+          reason: 'You have already submitted a review for this stay.',
+        };
+      }
+
+      return {
+        eligible: true,
+        hasReviewed: false,
+        hotelId: hotel.id,
+        hotelName: hotel.name,
+        reservationId: targetRes.id,
+        reservationCode: targetRes.reservation_code,
+        roomTypeId: targetRes.rooms[0]?.room_type_id || null,
+        stayDate: targetRes.check_out_date.toLocaleString('en-US', { month: 'long', year: 'numeric' }),
+      };
+    }
+
+    // 2. General hotel-level check: Find any unreviewed completed reservations
     const completedReservations = await prisma.reservation.findMany({
       where: {
         hotel_id: hotelId,
@@ -990,15 +1051,6 @@ export class HotelsService {
       select: { reservation_id: true, id: true },
     });
 
-    // If user has already reviewed as many or more stays than completed reservations, no pending reviews exist
-    if (existingReviews.length >= completedReservations.length) {
-      return {
-        eligible: false,
-        hasReviewed: true,
-        reason: 'You have already submitted a review for your past stay at this hotel.',
-      };
-    }
-
     const reviewedReservationIds = new Set(existingReviews.map((r) => r.reservation_id).filter(Boolean));
 
     // Find first unreviewed completed reservation
@@ -1008,7 +1060,7 @@ export class HotelsService {
       return {
         eligible: false,
         hasReviewed: true,
-        reason: 'You have already submitted a review for your past stay at this hotel.',
+        reason: 'You have already submitted a review for all your past stays at this hotel.',
       };
     }
 
@@ -1025,7 +1077,7 @@ export class HotelsService {
   }
 
   /**
-   * Submits a verified guest review. Strictly enforces that the reviewer has completed a stay.
+   * Submits a verified guest review. Strictly enforces that the review is tied to an individual completed stay.
    */
   async createReview(
     hotelId: string,
@@ -1042,56 +1094,72 @@ export class HotelsService {
       throw new NotFoundError('User not found');
     }
 
-    // 1. Enforce verified guest rule: User MUST have a completed stay (CHECKED_OUT)
-    const completedReservations = await prisma.reservation.findMany({
-      where: {
-        hotel_id: hotelId,
-        status: ReservationStatus.CHECKED_OUT,
-        OR: [
-          { guest_user_id: userId },
-          { guest_email: user.email },
-        ],
-      },
-      include: {
-        rooms: { select: { room_type_id: true }, take: 1 },
-      },
-      orderBy: { check_out_date: 'desc' },
-    });
+    let targetReservation: any = null;
 
-    if (completedReservations.length === 0) {
-      throw new ForbiddenError('Only verified guests with a completed stay can rate and review this hotel.');
-    }
+    if (input.reservationId) {
+      // Find the specific reservation
+      const target = await prisma.reservation.findFirst({
+        where: {
+          id: input.reservationId,
+          hotel_id: hotelId,
+          OR: [
+            { guest_user_id: userId },
+            { guest_email: user.email },
+          ],
+        },
+        include: {
+          rooms: { select: { room_type_id: true }, take: 1 },
+        },
+      });
 
-    // 2. Check total existing reviews for this hotel by this user
-    const existingUserReviews = await prisma.review.findMany({
-      where: { hotel_id: hotelId, user_id: userId },
-      select: { reservation_id: true },
-    });
+      if (!target) {
+        throw new NotFoundError('Reservation not found for this hotel.');
+      }
 
-    if (existingUserReviews.length >= completedReservations.length) {
-      throw new BadRequestError('You have already submitted a review for all your visits to this hotel.');
-    }
+      if (target.status !== ReservationStatus.CHECKED_OUT) {
+        throw new ForbiddenError('Only verified guests with a completed stay (checked out) can rate and review this hotel.');
+      }
 
-    const reviewedIds = new Set(existingUserReviews.map((r) => r.reservation_id).filter(Boolean));
+      const alreadyReviewed = await prisma.review.findFirst({
+        where: { reservation_id: target.id },
+      });
+      if (alreadyReviewed) {
+        throw new BadRequestError('You have already submitted a review for this completed stay.');
+      }
 
-    // 3. Select target reservation and verify it hasn't been reviewed yet
-    let targetReservation = input.reservationId
-      ? completedReservations.find((r) => r.id === input.reservationId)
-      : completedReservations.find((r) => !reviewedIds.has(r.id));
+      targetReservation = target;
+    } else {
+      // Find any unreviewed completed reservation for this hotel
+      const completedReservations = await prisma.reservation.findMany({
+        where: {
+          hotel_id: hotelId,
+          status: ReservationStatus.CHECKED_OUT,
+          OR: [
+            { guest_user_id: userId },
+            { guest_email: user.email },
+          ],
+        },
+        include: {
+          rooms: { select: { room_type_id: true }, take: 1 },
+        },
+        orderBy: { check_out_date: 'desc' },
+      });
 
-    if (!targetReservation) {
-      throw new BadRequestError('No eligible unreviewed completed visit found.');
-    }
+      if (completedReservations.length === 0) {
+        throw new ForbiddenError('Only verified guests with a completed stay can rate and review this hotel.');
+      }
 
-    if (reviewedIds.has(targetReservation.id)) {
-      throw new BadRequestError('You have already submitted a review for this completed stay.');
-    }
+      const existingUserReviews = await prisma.review.findMany({
+        where: { hotel_id: hotelId, user_id: userId },
+        select: { reservation_id: true },
+      });
 
-    const alreadyReviewed = await prisma.review.findFirst({
-      where: { reservation_id: targetReservation.id },
-    });
-    if (alreadyReviewed) {
-      throw new BadRequestError('You have already submitted a review for this completed stay.');
+      const reviewedIds = new Set(existingUserReviews.map((r) => r.reservation_id).filter(Boolean));
+      targetReservation = completedReservations.find((r) => !reviewedIds.has(r.id));
+
+      if (!targetReservation) {
+        throw new BadRequestError('You have already submitted a review for all your visits to this hotel.');
+      }
     }
 
     const stayDate = input.stayDate || (targetReservation

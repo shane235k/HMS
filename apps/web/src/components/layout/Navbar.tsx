@@ -242,10 +242,18 @@ export const Navbar: React.FC<NavbarProps> = ({ dark = false }) => {
                             </p>
                             {notif.type === 'CHECKOUT_COMPLETE' && !notif.isReviewed && (
                               <div className="mt-2">
-                                <span className="inline-flex items-center gap-1 text-[11px] font-normal text-black bg-white border border-neutral-300 rounded px-2 py-0.5 shadow-2xs hover:bg-neutral-100">
+                                <Link
+                                  href={
+                                    (notif.metadata as any)?.hotelId
+                                      ? `/hotels/${(notif.metadata as any).hotelId}?review=true&reservationId=${(notif.metadata as any).reservationId || ''}`
+                                      : '/reservations'
+                                  }
+                                  onClick={() => setIsNotifOpen(false)}
+                                  className="inline-flex items-center gap-1 text-[11px] font-normal text-black bg-white border border-neutral-300 rounded px-2 py-0.5 shadow-2xs hover:bg-neutral-100"
+                                >
                                   <Star className="w-3 h-3 fill-black text-black" />
                                   Rate Your Stay
-                                </span>
+                                </Link>
                               </div>
                             )}
                             {notif.type === 'CHECKOUT_COMPLETE' && notif.isReviewed && (

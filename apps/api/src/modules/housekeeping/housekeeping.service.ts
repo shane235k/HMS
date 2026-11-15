@@ -63,6 +63,15 @@ export class HousekeepingService {
 
     return {
       totalRooms: rooms.length,
+      dirtyCount: roomStatusCounts.DIRTY || 0,
+      cleaningCount: roomStatusCounts.CLEANING || 0,
+      inspectionCount: roomStatusCounts.INSPECTION || 0,
+      readyCount: roomStatusCounts.READY || 0,
+      maintenanceCount: openMaintenanceCount,
+      pendingCount: taskStatusCounts.PENDING || 0,
+      completedCount: taskStatusCounts.COMPLETED || 0,
+      completedTasksToday: taskStatusCounts.COMPLETED || 0,
+      openTasksCount: (taskStatusCounts.PENDING || 0) + (taskStatusCounts.IN_PROGRESS || 0) + (taskStatusCounts.AWAITING_INSPECTION || 0),
       roomStatusCounts,
       taskStatusCounts,
       openMaintenanceCount,
@@ -109,7 +118,14 @@ export class HousekeepingService {
     });
     const roomMap = new Map(rooms.map((r) => [r.id, r]));
 
-    const staffIds = Array.from(new Set(tasks.map((t) => t.assigned_to_id).filter(Boolean))) as string[];
+    const staffIds = Array.from(
+      new Set(
+        [
+          ...tasks.map((t) => t.assigned_to_id),
+          ...tasks.map((t) => t.inspected_by_id),
+        ].filter(Boolean)
+      )
+    ) as string[];
     const staffUsers = staffIds.length > 0 ? await prisma.user.findMany({
       where: { id: { in: staffIds } },
       select: { id: true, first_name: true, last_name: true },
@@ -121,9 +137,11 @@ export class HousekeepingService {
       type: t.task_type,
       status: t.status,
       notes: t.notes,
+      created_at: t.created_at,
       started_at: t.started_at,
       completed_at: t.completed_at,
       assigned_to: t.assigned_to_id ? staffMap.get(t.assigned_to_id) : undefined,
+      inspected_by: t.inspected_by_id ? staffMap.get(t.inspected_by_id) : undefined,
       room: roomMap.get(t.room_id) || {
         id: t.room_id,
         room_number: 'N/A',

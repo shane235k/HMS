@@ -34,6 +34,7 @@ import {
   Send,
   Lock,
   MessageSquare,
+  Tag,
 } from 'lucide-react';
 
 export default function RoomDetailsPage() {
@@ -472,6 +473,100 @@ export default function RoomDetailsPage() {
                 </div>
 
                 {/* ==================================================== */}
+                {/* 2B. PACKAGE INCLUSIONS & OFFERS (Selected Package)    */}
+                {/* Dynamically reflects what the selected rate offers   */}
+                {/* ==================================================== */}
+                <div className="rounded-3xl border border-neutral-200/90 p-6 sm:p-8 space-y-5 bg-gradient-to-br from-neutral-50/60 to-white shadow-xs">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-neutral-200/70 pb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-xl bg-black text-white flex items-center justify-center shrink-0">
+                        <Tag className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <span className="text-[10px] uppercase font-mono tracking-wider text-neutral-400 block font-normal">
+                          Selected Rate Package
+                        </span>
+                        <h3 className="text-lg font-normal text-neutral-900 flex items-center gap-2">
+                          <span>{selectedRatePlan?.name || 'Standard Rate'}</span>
+                          {selectedRatePlan?.isDefault && (
+                            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-neutral-100 text-neutral-800 border border-neutral-200">
+                              RECOMMENDED
+                            </span>
+                          )}
+                        </h3>
+                      </div>
+                    </div>
+
+                    <div className="text-left sm:text-right">
+                      <span className="text-xl font-normal font-mono text-black">
+                        {formatCurrencyMinor(nightlyRateCents, roomData.hotel.currency || 'INR')}
+                      </span>
+                      <span className="text-xs text-neutral-400 font-light block">/ night</span>
+                    </div>
+                  </div>
+
+                  {/* Package Inclusions / Description Box */}
+                  <div className="p-4 rounded-2xl bg-white border border-neutral-200/80 space-y-2">
+                    <span className="text-[11px] font-mono uppercase text-neutral-500 block font-normal">
+                      What This Package Offers & Includes:
+                    </span>
+                    <p className="text-sm text-neutral-700 font-light leading-relaxed">
+                      {selectedRatePlan?.description ||
+                        'Standard flexible rate offering full access to hotel amenities, high-speed Wi-Fi, and flexible cancellation protection.'}
+                    </p>
+                  </div>
+
+                  {/* Policy & Window Badges */}
+                  <div className="flex flex-wrap items-center gap-2.5 text-xs text-neutral-600 font-light">
+                    <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-neutral-100/80 border border-neutral-200/60">
+                      <ShieldCheck className="w-3.5 h-3.5 text-neutral-800" />
+                      <span>
+                        {selectedRatePlan?.cancellationPolicy === 'FREE_CANCELLATION'
+                          ? `Free cancellation up to ${selectedRatePlan?.cancellationDeadlineHours || 48}h before arrival`
+                          : selectedRatePlan?.cancellationPolicy || 'Standard Policy'}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-neutral-100/80 border border-neutral-200/60">
+                      <Clock className="w-3.5 h-3.5 text-neutral-800" />
+                      <span>Check-in: {roomData.hotel.checkInTime} &bull; Check-out: {roomData.hotel.checkOutTime}</span>
+                    </div>
+                  </div>
+
+                  {/* Multi-package switcher on left side panel if room has > 1 package */}
+                  {roomData.ratePlans && roomData.ratePlans.length > 1 && (
+                    <div className="pt-3 border-t border-neutral-200/60 space-y-2">
+                      <span className="text-[11px] font-mono text-neutral-500 block">
+                        Switch Package Option ({roomData.ratePlans.length} Available for this Room):
+                      </span>
+                      <div className="flex flex-wrap gap-2">
+                        {roomData.ratePlans.map((rp: any) => {
+                          const isSelected = rp.id === selectedRatePlanId;
+                          return (
+                            <button
+                              key={rp.id}
+                              type="button"
+                              onClick={() => setSelectedRatePlanId(rp.id)}
+                              className={`px-3.5 py-2 rounded-xl text-xs transition-all text-left flex items-center gap-2 border ${
+                                isSelected
+                                  ? 'bg-neutral-900 text-white border-black shadow-xs font-normal'
+                                  : 'bg-white hover:bg-neutral-100 border-neutral-200 text-neutral-800 font-light'
+                              }`}
+                            >
+                              <span className={`w-2 h-2 rounded-full ${isSelected ? 'bg-emerald-400' : 'bg-neutral-300'}`} />
+                              <span>{rp.name}</span>
+                              <span className="font-mono text-[11px] opacity-80">
+                                ({formatCurrencyMinor(rp.basePriceCents, roomData.hotel.currency || 'INR')})
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* ==================================================== */}
                 {/* 3. AMENITIES GRID (Matching Screenshot Layout)       */}
                 {/* ==================================================== */}
                 <div className="rounded-3xl border border-neutral-200/80 p-6 sm:p-8 space-y-6 bg-white">
@@ -764,9 +859,14 @@ export default function RoomDetailsPage() {
 
                   {/* Special Rates Selector */}
                   <div className="space-y-1.5">
-                    <label className="block text-[11px] text-neutral-400 font-light">
-                      Special Rates / Package
-                    </label>
+                    <div className="flex items-center justify-between">
+                      <label className="block text-[11px] text-neutral-400 font-light">
+                        Special Rates / Package
+                      </label>
+                      <span className="text-[10px] font-mono text-neutral-400">
+                        {roomData.ratePlans.length} {roomData.ratePlans.length === 1 ? 'option' : 'options'}
+                      </span>
+                    </div>
                     <select
                       value={selectedRatePlanId}
                       onChange={(e) => setSelectedRatePlanId(e.target.value)}
@@ -778,6 +878,9 @@ export default function RoomDetailsPage() {
                         </option>
                       ))}
                     </select>
+                    <p className="text-[10px] text-neutral-400 font-light pl-0.5">
+                      Review package inclusions & offers in the main room dossier on the left
+                    </p>
                   </div>
 
                   {/* Pricing Display in Rupees */}

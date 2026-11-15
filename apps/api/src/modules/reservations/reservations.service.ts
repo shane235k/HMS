@@ -405,13 +405,14 @@ export class ReservationsService {
             slug: true,
             city: true,
             country: true,
+            images: true,
             check_in_time: true,
             check_out_time: true,
           },
         },
         rooms: {
           include: {
-            room_type: { select: { id: true, name: true } },
+            room_type: { select: { id: true, name: true, images: true } },
             rate_plan: { select: { id: true, name: true, cancellation_policy: true } },
           },
         },
@@ -428,10 +429,7 @@ export class ReservationsService {
     const resIds = list.map((r) => r.id);
     const existingReviews = await prisma.review.findMany({
       where: {
-        OR: [
-          { reservation_id: { in: resIds } },
-          { user_id: userId, hotel_id: { in: list.map((r) => r.hotel_id) } },
-        ],
+        reservation_id: { in: resIds },
       },
       select: {
         id: true,
@@ -446,19 +444,15 @@ export class ReservationsService {
     });
 
     const reviewMapByResId = new Map<string, any>();
-    const reviewMapByHotelId = new Map<string, any>();
     for (const rev of existingReviews) {
       if (rev.reservation_id) {
         reviewMapByResId.set(rev.reservation_id, rev);
-      }
-      if (rev.hotel_id) {
-        reviewMapByHotelId.set(rev.hotel_id, rev);
       }
     }
 
     const nowTime = Date.now();
     return list.map((res) => {
-      const matchingReview = reviewMapByResId.get(res.id) || reviewMapByHotelId.get(res.hotel_id) || null;
+      const matchingReview = reviewMapByResId.get(res.id) || null;
       const isReviewed = Boolean(matchingReview);
 
       const checkInDate = new Date(res.check_in_date);

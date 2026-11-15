@@ -1,5 +1,7 @@
 // apps/api/src/app.ts
 import express, { Application, Request, Response } from 'express';
+import path from 'path';
+import fs from 'fs';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
@@ -71,8 +73,18 @@ export const createApp = (): Application => {
   app.options('*', cors(corsOptions));
 
   app.use(morgan(env.NODE_ENV === 'development' ? 'dev' : 'combined'));
-  app.use(express.json());
+  app.use(express.json({ limit: '10mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '10mb' }));
   app.use(cookieParser());
+
+  // Serve uploaded assets directly
+  let uploadsDir = path.resolve(process.cwd(), 'apps/web/public/uploads');
+  if (fs.existsSync(path.resolve(process.cwd(), '../web/public'))) {
+    uploadsDir = path.resolve(process.cwd(), '../web/public/uploads');
+  } else if (!fs.existsSync(path.resolve(process.cwd(), 'apps/web/public'))) {
+    uploadsDir = path.resolve(__dirname, '../../../web/public/uploads');
+  }
+  app.use('/uploads', express.static(uploadsDir));
 
   // Health check
   app.get('/api/health', (req: Request, res: Response) => {

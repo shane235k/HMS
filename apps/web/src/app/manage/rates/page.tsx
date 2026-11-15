@@ -135,6 +135,12 @@ function ManagerRatesContent() {
     setPlanActionLoading(true);
     setPlanModalError(null);
     try {
+      if (!planDescription.trim()) {
+        setPlanModalError('Package description is required.');
+        setPlanActionLoading(false);
+        return;
+      }
+
       const basePriceCents = Math.round(parseFloat(planBasePrice) * 100);
 
       await apiFetch('/management/rate-plans', {
@@ -509,11 +515,12 @@ function ManagerRatesContent() {
           </div>
 
           <div>
-            <label className="text-xs font-medium text-charcoal-700 block mb-1">Description</label>
+            <label className="text-xs font-medium text-charcoal-700 block mb-1">Package Inclusions & Description *</label>
             <Input
               value={planDescription}
               onChange={(e) => setPlanDescription(e.target.value)}
-              placeholder="e.g. 15% discount for non-refundable reservations"
+              placeholder="e.g. Complimentary gourmet buffet breakfast, spa access, and free cancellation"
+              required
             />
           </div>
 

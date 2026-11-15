@@ -173,13 +173,26 @@ export default function AdminApplicationsPage() {
                         return (
                           <tr key={app.id} className="hover:bg-canvas-neutral/50 transition-colors">
                             <td className="py-4 px-5">
-                              <div className="space-y-1">
-                                <div className="font-normal text-charcoal-900 text-sm">{hotelName}</div>
-                                <div className="flex items-center gap-1.5">
-                                  <Badge variant="primary" className="font-normal">{app.category}</Badge>
-                                  <span className="text-[10px] text-charcoal-500 font-mono">
-                                    {formattedDate}
-                                  </span>
+                              <div className="flex items-center gap-3">
+                                {((app as any).coverImage || (app as any).cover_image) ? (
+                                  <img
+                                    src={(app as any).coverImage || (app as any).cover_image}
+                                    alt=""
+                                    className="w-12 h-12 rounded-xl object-cover border border-charcoal-200 shrink-0"
+                                  />
+                                ) : (
+                                  <div className="w-12 h-12 rounded-xl bg-neutral-100 border border-neutral-200 flex items-center justify-center text-neutral-400 shrink-0">
+                                    <Building2 className="w-5 h-5" />
+                                  </div>
+                                )}
+                                <div className="space-y-1">
+                                  <div className="font-normal text-charcoal-900 text-sm">{hotelName}</div>
+                                  <div className="flex items-center gap-1.5">
+                                    <Badge variant="primary" className="font-normal">{app.category}</Badge>
+                                    <span className="text-[10px] text-charcoal-500 font-mono">
+                                      {formattedDate}
+                                    </span>
+                                  </div>
                                 </div>
                               </div>
                             </td>
@@ -285,6 +298,19 @@ export default function AdminApplicationsPage() {
         )}
 
         <form onSubmit={handleReviewSubmit} className="space-y-4">
+          {((selectedApp as any)?.coverImage || (selectedApp as any)?.cover_image) && (
+            <div className="relative h-40 w-full rounded-xl overflow-hidden border border-charcoal-200 shadow-xs">
+              <img
+                src={(selectedApp as any)?.coverImage || (selectedApp as any)?.cover_image}
+                alt="Property Thumbnail"
+                className="w-full h-full object-cover"
+              />
+              <div className="absolute top-2.5 left-2.5 bg-black/60 backdrop-blur-xs text-white text-[10px] font-mono px-2 py-0.5 rounded-full uppercase tracking-wider">
+                Submitted Cover Photo
+              </div>
+            </div>
+          )}
+
           <div className="p-3.5 rounded-xl bg-canvas-neutral border border-charcoal-200 text-xs space-y-1.5 font-normal">
             <div className="flex justify-between">
               <span className="text-charcoal-700 font-normal">Applicant:</span>

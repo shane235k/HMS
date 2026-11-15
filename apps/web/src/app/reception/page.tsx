@@ -38,6 +38,8 @@ interface Assignment {
   slot_index: number;
   room_id: string;
   status: string;
+  assigned_at?: string;
+  released_at?: string;
   room?: {
     id: string;
     room_number: string;
@@ -65,6 +67,8 @@ interface Reservation {
   guest_phone?: string;
   check_in_date: string;
   check_out_date: string;
+  checked_in_at?: string;
+  checked_out_at?: string;
   total_nights: number;
   total_rooms: number;
   total_amount_cents: number;
@@ -658,6 +662,23 @@ export default function ReceptionPage() {
                             <div className="text-xs text-charcoal-600 font-mono">
                               Stay: {res.check_in_date?.split('T')[0]} → {res.check_out_date?.split('T')[0]} ({res.total_nights} nights)
                             </div>
+
+                            {(res.checked_in_at || res.checked_out_at) && (
+                              <div className="flex flex-wrap items-center gap-2 pt-0.5 text-[11px] font-mono">
+                                {res.checked_in_at && (
+                                  <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 flex items-center gap-1" title={`Check-in: ${new Date(res.checked_in_at).toLocaleString()}`}>
+                                    <LogIn className="w-3 h-3 text-emerald-600" />
+                                    <span>In: {new Date(res.checked_in_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}</span>
+                                  </span>
+                                )}
+                                {res.checked_out_at && (
+                                  <span className="px-2 py-0.5 rounded bg-neutral-100 text-neutral-800 border border-neutral-300 flex items-center gap-1" title={`Check-out: ${new Date(res.checked_out_at).toLocaleString()}`}>
+                                    <LogOut className="w-3 h-3 text-neutral-600" />
+                                    <span>Out: {new Date(res.checked_out_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}</span>
+                                  </span>
+                                )}
+                              </div>
+                            )}
                           </div>
 
                           {/* Room & Assignment Slot Status */}
@@ -678,7 +699,9 @@ export default function ReceptionPage() {
                                   {/* Slots for this line item */}
                                   <div className="flex flex-wrap gap-2">
                                     {Array.from({ length: line.quantity }).map((_, slotIdx) => {
-                                      const assignment = line.assignments?.find((a) => a.slot_index === slotIdx);
+                                      const assignment =
+                                        line.assignments?.find((a) => a.slot_index === slotIdx && a.status === 'ACTIVE') ||
+                                        line.assignments?.find((a) => a.slot_index === slotIdx);
                                       const assignedRoom = assignment?.room;
 
                                       return (
@@ -706,6 +729,11 @@ export default function ReceptionPage() {
                                               >
                                                 {assignedRoom.operational_status}
                                               </Badge>
+                                              {assignment?.assigned_at && (
+                                                <span className="text-[10px] text-charcoal-400 font-mono" title={`Assigned: ${new Date(assignment.assigned_at).toLocaleString()}`}>
+                                                  {new Date(assignment.assigned_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                </span>
+                                              )}
                                               {res.status === 'CONFIRMED' && (
                                                 isArrivalToday ? (
                                                   <button
